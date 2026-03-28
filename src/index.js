@@ -4,7 +4,10 @@ const {
   Client,
   GatewayIntentBits,
   Partials,
-  EmbedBuilder
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require("discord.js");
 
 const db = require("./db");
@@ -19,10 +22,13 @@ const client = new Client({
 });
 
 const FARM_CHANNEL_ID = process.env.FARM_CHANNEL_ID;
+const HARVEST_CHANNEL_ID = process.env.HARVEST_CHANNEL_ID;
 const HARVEST_ROLE_ID = process.env.HARVEST_ROLE_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
+// 30 sekundi
 const GROW_TIME_MS = 30 * 1000;
+
 const activeTimers = new Map();
 
 function normalizeCropName(input) {
@@ -93,7 +99,7 @@ function buildPlantEmbed({
   return embed;
 }
 
-function buildHarvestEmbed({
+function buildHarvestReadyEmbed({
   cropName,
   amount,
   userId,
@@ -118,6 +124,49 @@ function buildHarvestEmbed({
   }
 
   return embed;
+}
+
+function buildHarvestedEmbed({
+  cropName,
+  amount,
+  plantedByUserId,
+  plantedAt,
+  harvestAt,
+  harvestedByUserId,
+  harvestedAt,
+  imageUrl
+}) {
+  const embed = new EmbedBuilder()
+    .setTitle("✅ Obrano!")
+    .setDescription(
+      `<@${plantedByUserId}> je posadio/la, a <@${harvestedByUserId}> je obrao/la.`
+    )
+    .addFields(
+      { name: "🌿 Vrsta", value: cropName, inline: true },
+      { name: "📦 Količina", value: String(amount), inline: true },
+      { name: "🕒 Posađeno", value: discordTime(plantedAt), inline: true },
+      { name: "⏰ Spremno", value: discordTime(harvestAt), inline: true },
+      { name: "🧺 Obrano", value: discordTime(harvestedAt), inline: true },
+      { name: "👨‍🌾 Obrao", value: `<@${harvestedByUserId}>`, inline: true },
+      { name: "📍 Lokacija", value: "Ranch", inline: true }
+    )
+    .setColor(0x5865f2);
+
+  if (imageUrl) {
+    embed.setImage(imageUrl);
+  }
+
+  return embed;
+}
+
+function buildHarvestButton(plantingId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`harvest_${plantingId}`)
+      .setLabel("Obrano")
+      .setStyle(ButtonStyle.Success)
+      .setEmoji("🧺")
+  );
 }
 
 function insertPlanting(data) {
@@ -152,14 +201,45 @@ function insertPlanting(data) {
   });
 }
 
+function getPlantingById(id) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT id, guild_id as guildId, channel_id as channelId, user_id as userId, message_id as messageId,
+              crop_key as cropKey, amount, planted_at as plantedAt, harvest_at as harvestAt, harvested
+       FROM plantings
+       WHERE id = ?`,
+      [id],
+      (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      }
+    );
+  });
+}
+
+function markPlantingHarvested(id) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE plantings
+       SET harvested = 1
+       WHERE id = ? AND harvested = 0`,
+      [id],
+      function (err) {
+        if (err) return reject(err);
+        resolve(this.changes > 0);
+      }
+    );
+  });
+}
+
 async function sendHarvestMessage(row) {
   const guild = await client.guilds.fetch(row.guildId).catch(() => null);
   if (!guild) return;
 
-  const channel = await guild.channels.fetch(row.channelId).catch(() => null);
+  const channel = await guild.channels.fetch(HARVEST_CHANNEL_ID).catch(() => null);
   if (!channel || !channel.isTextBased()) return;
 
-  const embed = buildHarvestEmbed({
+  const embed = buildHarvestReadyEmbed({
     cropName: formatCropName(row.cropKey),
     amount: row.amount,
     userId: row.userId,
@@ -168,9 +248,14 @@ async function sendHarvestMessage(row) {
     imageUrl: row.imageUrl || null
   });
 
+  const components = [buildHarvestButton(row.id)];
+
   await channel.send({
-    content: `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`,
-    embeds: [embed]
+    content: HARVEST_ROLE_ID
+      ? `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`
+      : `<@${row.userId}>`,
+    embeds: [embed],
+    components
   });
 }
 
@@ -226,6 +311,67 @@ client.on("messageCreate", async (message) => {
   });
 
   await message.channel.send({ embeds: [embed] });
+});
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isButton()) return;
+  if (!interaction.customId.startsWith("harvest_")) return;
+
+  const plantingId = Number(interaction.customId.replace("harvest_", ""));
+  if (!Number.isInteger(plantingId)) {
+    await interaction.reply({
+      content: "Neispravan ID sadnje.",
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  const planting = await getPlantingById(plantingId).catch(() => null);
+
+  if (!planting) {
+    await interaction.reply({
+      content: "Sadnja nije pronađena.",
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  if (planting.harvested) {
+    await interaction.reply({
+      content: "Ovo je već obrano.",
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  const updated = await markPlantingHarvested(plantingId).catch(() => false);
+
+  if (!updated) {
+    await interaction.reply({
+      content: "Neko je već obrao pre tebe.",
+      ephemeral: true
+    }).catch(() => null);
+    return;
+  }
+
+  const harvestedAt = Date.now();
+
+  const embed = buildHarvestedEmbed({
+    cropName: formatCropName(planting.cropKey),
+    amount: planting.amount,
+    plantedByUserId: planting.userId,
+    plantedAt: planting.plantedAt,
+    harvestAt: planting.harvestAt,
+    harvestedByUserId: interaction.user.id,
+    harvestedAt,
+    imageUrl: null
+  });
+
+  await interaction.update({
+    content: `✅ Obrano od strane <@${interaction.user.id}>`,
+    embeds: [embed],
+    components: []
+  }).catch(() => null);
 });
 
 client.once("clientReady", () => {
