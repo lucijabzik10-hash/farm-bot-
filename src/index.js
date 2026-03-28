@@ -40,7 +40,7 @@ function formatCropName(input) {
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
-// Podrzava:
+// podrzava:
 // cvetx5
 // cvet x 5
 // cvet 5
@@ -164,8 +164,8 @@ function buildHarvestButton(plantingId) {
     new ButtonBuilder()
       .setCustomId(`harvest_${plantingId}`)
       .setLabel("Obrano")
-      .setStyle(ButtonStyle.Success)
       .setEmoji("🧺")
+      .setStyle(ButtonStyle.Success)
   );
 }
 
@@ -181,8 +181,9 @@ function insertPlanting(data) {
         amount,
         planted_at,
         harvest_at,
-        harvested
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        harvested,
+        image_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
       [
         data.guildId,
         data.channelId,
@@ -191,7 +192,8 @@ function insertPlanting(data) {
         data.cropKey,
         data.amount,
         data.plantedAt,
-        data.harvestAt
+        data.harvestAt,
+        data.imageUrl || null
       ],
       function (err) {
         if (err) return reject(err);
@@ -204,10 +206,24 @@ function insertPlanting(data) {
 function getPlantingById(id) {
   return new Promise((resolve, reject) => {
     db.get(
-      `SELECT id, guild_id as guildId, channel_id as channelId, user_id as userId, message_id as messageId,
-              crop_key as cropKey, amount, planted_at as plantedAt, harvest_at as harvestAt, harvested
-       FROM plantings
-       WHERE id = ?`,
+      `SELECT
+        id,
+        guild_id as guildId,
+        channel_id as channelId,
+        user_id as userId,
+        message_id as messageId,
+        crop_key as cropKey,
+        amount,
+        planted_at as plantedAt,
+        harvest_at as harvestAt,
+        harvested,
+        image_url as imageUrl,
+        harvest_message_id as harvestMessageId,
+        harvest_channel_id as harvestChannelId,
+        harvested_by as harvestedBy,
+        harvested_at as harvestedAt
+      FROM plantings
+      WHERE id = ?`,
       [id],
       (err, row) => {
         if (err) return reject(err);
@@ -217,13 +233,60 @@ function getPlantingById(id) {
   });
 }
 
-function markPlantingHarvested(id) {
+function getPendingPlantings() {
+  return new Promise((resolve, reject) => {
+    db.all(
+      `SELECT
+        id,
+        guild_id as guildId,
+        channel_id as channelId,
+        user_id as userId,
+        message_id as messageId,
+        crop_key as cropKey,
+        amount,
+        planted_at as plantedAt,
+        harvest_at as harvestAt,
+        harvested,
+        image_url as imageUrl,
+        harvest_message_id as harvestMessageId,
+        harvest_channel_id as harvestChannelId,
+        harvested_by as harvestedBy,
+        harvested_at as harvestedAt
+      FROM plantings
+      WHERE harvested = 0`,
+      [],
+      (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+      }
+    );
+  });
+}
+
+function saveHarvestMessageInfo(id, harvestChannelId, harvestMessageId) {
   return new Promise((resolve, reject) => {
     db.run(
       `UPDATE plantings
-       SET harvested = 1
+       SET harvest_channel_id = ?, harvest_message_id = ?
+       WHERE id = ?`,
+      [harvestChannelId, harvestMessageId, id],
+      function (err) {
+        if (err) return reject(err);
+        resolve(true);
+      }
+    );
+  });
+}
+
+function markPlantingHarvested(id, harvestedBy, harvestedAt) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE plantings
+       SET harvested = 1,
+           harvested_by = ?,
+           harvested_at = ?
        WHERE id = ? AND harvested = 0`,
-      [id],
+      [harvestedBy, harvestedAt, id],
       function (err) {
         if (err) return reject(err);
         resolve(this.changes > 0);
@@ -248,134 +311,187 @@ async function sendHarvestMessage(row) {
     imageUrl: row.imageUrl || null
   });
 
-  const components = [buildHarvestButton(row.id)];
-
-  await channel.send({
+  const sentMessage = await channel.send({
     content: HARVEST_ROLE_ID
       ? `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`
       : `<@${row.userId}>`,
     embeds: [embed],
-    components
+    components: [buildHarvestButton(row.id)]
   });
+
+  await saveHarvestMessageInfo(row.id, channel.id, sentMessage.id);
 }
 
 function scheduleHarvest(row) {
+  if (activeTimers.has(row.id)) {
+    clearTimeout(activeTimers.get(row.id));
+    activeTimers.delete(row.id);
+  }
+
   const delay = Math.max(0, row.harvestAt - Date.now());
 
   const timeout = setTimeout(async () => {
-    await sendHarvestMessage(row);
-    activeTimers.delete(row.id);
+    try {
+      const fresh = await getPlantingById(row.id);
+      if (!fresh || fresh.harvested) return;
+
+      if (fresh.harvestMessageId && fresh.harvestChannelId) {
+        return;
+      }
+
+      await sendHarvestMessage(fresh);
+    } catch (err) {
+      console.error("Greška u scheduleHarvest:", err);
+    } finally {
+      activeTimers.delete(row.id);
+    }
   }, delay);
 
   activeTimers.set(row.id, timeout);
 }
 
+async function restorePendingPlantings() {
+  const pending = await getPendingPlantings();
+
+  for (const planting of pending) {
+    if (planting.harvestMessageId && planting.harvestChannelId) {
+      continue;
+    }
+
+    scheduleHarvest(planting);
+  }
+
+  console.log(`Vraćeno aktivnih sadnji: ${pending.length}`);
+}
+
 client.on("messageCreate", async (message) => {
-  if (!message.guild) return;
-  if (message.author.bot) return;
-  if (message.guild.id !== GUILD_ID) return;
-  if (message.channel.id !== FARM_CHANNEL_ID) return;
+  try {
+    if (!message.guild) return;
+    if (message.author.bot) return;
+    if (message.guild.id !== GUILD_ID) return;
+    if (message.channel.id !== FARM_CHANNEL_ID) return;
 
-  const parsed = parsePlantMessage(message.content);
-  if (!parsed) return;
+    const parsed = parsePlantMessage(message.content);
+    if (!parsed) return;
 
-  const plantedAt = Date.now();
-  const harvestAt = plantedAt + GROW_TIME_MS;
-  const imageUrl = getMessageImage(message);
+    const plantedAt = Date.now();
+    const harvestAt = plantedAt + GROW_TIME_MS;
+    const imageUrl = getMessageImage(message);
 
-  const saved = await insertPlanting({
-    guildId: message.guild.id,
-    channelId: message.channel.id,
-    userId: message.author.id,
-    messageId: message.id,
-    cropKey: parsed.cropKey,
-    amount: parsed.amount,
-    plantedAt,
-    harvestAt,
-    imageUrl
-  });
+    const saved = await insertPlanting({
+      guildId: message.guild.id,
+      channelId: message.channel.id,
+      userId: message.author.id,
+      messageId: message.id,
+      cropKey: parsed.cropKey,
+      amount: parsed.amount,
+      plantedAt,
+      harvestAt,
+      imageUrl
+    });
 
-  saved.imageUrl = imageUrl;
+    scheduleHarvest(saved);
 
-  scheduleHarvest(saved);
+    await message.react("✅").catch(() => null);
 
-  await message.react("✅").catch(() => null);
+    const embed = buildPlantEmbed({
+      cropName: formatCropName(parsed.cropKey),
+      amount: parsed.amount,
+      userId: message.author.id,
+      plantedAt,
+      harvestAt,
+      imageUrl
+    });
 
-  const embed = buildPlantEmbed({
-    cropName: formatCropName(parsed.cropKey),
-    amount: parsed.amount,
-    userId: message.author.id,
-    plantedAt,
-    harvestAt,
-    imageUrl
-  });
-
-  await message.channel.send({ embeds: [embed] });
+    await message.channel.send({ embeds: [embed] });
+  } catch (err) {
+    console.error("Greška u messageCreate:", err);
+  }
 });
 
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
-  if (!interaction.customId.startsWith("harvest_")) return;
+  try {
+    if (!interaction.isButton()) return;
+    if (!interaction.customId.startsWith("harvest_")) return;
 
-  const plantingId = Number(interaction.customId.replace("harvest_", ""));
-  if (!Number.isInteger(plantingId)) {
-    await interaction.reply({
-      content: "Neispravan ID sadnje.",
-      ephemeral: true
+    const plantingId = Number(interaction.customId.replace("harvest_", ""));
+    if (!Number.isInteger(plantingId)) {
+      await interaction.reply({
+        content: "Neispravan ID sadnje.",
+        ephemeral: true
+      }).catch(() => null);
+      return;
+    }
+
+    const planting = await getPlantingById(plantingId);
+
+    if (!planting) {
+      await interaction.reply({
+        content: "Sadnja nije pronađena.",
+        ephemeral: true
+      }).catch(() => null);
+      return;
+    }
+
+    if (planting.harvested) {
+      await interaction.reply({
+        content: "Ovo je već obrano.",
+        ephemeral: true
+      }).catch(() => null);
+      return;
+    }
+
+    const harvestedAt = Date.now();
+    const updated = await markPlantingHarvested(
+      plantingId,
+      interaction.user.id,
+      harvestedAt
+    );
+
+    if (!updated) {
+      await interaction.reply({
+        content: "Neko je već obrao pre tebe.",
+        ephemeral: true
+      }).catch(() => null);
+      return;
+    }
+
+    const embed = buildHarvestedEmbed({
+      cropName: formatCropName(planting.cropKey),
+      amount: planting.amount,
+      plantedByUserId: planting.userId,
+      plantedAt: planting.plantedAt,
+      harvestAt: planting.harvestAt,
+      harvestedByUserId: interaction.user.id,
+      harvestedAt,
+      imageUrl: planting.imageUrl || null
+    });
+
+    await interaction.update({
+      content: `✅ Obrano od strane <@${interaction.user.id}>`,
+      embeds: [embed],
+      components: []
     }).catch(() => null);
-    return;
+  } catch (err) {
+    console.error("Greška u interactionCreate:", err);
+
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: "Došlo je do greške.",
+        ephemeral: true
+      }).catch(() => null);
+    }
   }
-
-  const planting = await getPlantingById(plantingId).catch(() => null);
-
-  if (!planting) {
-    await interaction.reply({
-      content: "Sadnja nije pronađena.",
-      ephemeral: true
-    }).catch(() => null);
-    return;
-  }
-
-  if (planting.harvested) {
-    await interaction.reply({
-      content: "Ovo je već obrano.",
-      ephemeral: true
-    }).catch(() => null);
-    return;
-  }
-
-  const updated = await markPlantingHarvested(plantingId).catch(() => false);
-
-  if (!updated) {
-    await interaction.reply({
-      content: "Neko je već obrao pre tebe.",
-      ephemeral: true
-    }).catch(() => null);
-    return;
-  }
-
-  const harvestedAt = Date.now();
-
-  const embed = buildHarvestedEmbed({
-    cropName: formatCropName(planting.cropKey),
-    amount: planting.amount,
-    plantedByUserId: planting.userId,
-    plantedAt: planting.plantedAt,
-    harvestAt: planting.harvestAt,
-    harvestedByUserId: interaction.user.id,
-    harvestedAt,
-    imageUrl: null
-  });
-
-  await interaction.update({
-    content: `✅ Obrano od strane <@${interaction.user.id}>`,
-    embeds: [embed],
-    components: []
-  }).catch(() => null);
 });
 
-client.once("clientReady", () => {
+client.once("clientReady", async () => {
   console.log(`Bot online kao ${client.user.tag}`);
+
+  try {
+    await restorePendingPlantings();
+  } catch (err) {
+    console.error("Greška pri vraćanju sadnji:", err);
+  }
 });
 
 const token = process.env.DISCORD_TOKEN?.trim();
@@ -384,8 +500,5 @@ if (!token) {
   console.error("DISCORD_TOKEN nije postavljen.");
   process.exit(1);
 }
-
-console.log("DISCORD_TOKEN postoji:", true);
-console.log("Duzina tokena:", token.length);
 
 client.login(token);
