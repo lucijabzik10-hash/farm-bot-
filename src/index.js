@@ -161,7 +161,7 @@ client.on("messageCreate", async (message) => {
 
   scheduleHarvest(saved);
 
-  await message.react("✅");
+  await message.react("✅").catch(() => null);
 
   const embed = buildPlantEmbed({
     cropName: crop.displayName,
@@ -174,12 +174,10 @@ client.on("messageCreate", async (message) => {
   await message.channel.send({ embeds: [embed] });
 });
 
-client.once("ready", () => {
+client.once("clientReady", () => {
   console.log(`Bot online kao ${client.user.tag}`);
 });
 
-
-// ✅ TOKEN FIX (SAMO OVO NA KRAJU)
 const token = process.env.DISCORD_TOKEN?.trim();
 
 if (!token) {
