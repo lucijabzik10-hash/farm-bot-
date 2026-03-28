@@ -25,25 +25,27 @@ const GUILD_ID = process.env.GUILD_ID;
 const GROW_TIME_MS = 5 * 60 * 60 * 1000;
 const activeTimers = new Map();
 
-const CROPS = {
-  luk: {
-    displayName: "Luk",
-    growTimeMs: GROW_TIME_MS
-  }
-};
-
 function normalizeCropName(input) {
   return input.trim().toLowerCase();
 }
 
+function formatCropName(input) {
+  const clean = input.trim();
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
 function parsePlantMessage(content) {
-  const match = content.trim().match(/^([a-zA-ZčćžšđČĆŽŠĐ]+)\s*x\s*(\d+)$/i);
+  // Podrzava:
+  // cvetx5
+  // cvet x 5
+  // cvet 5
+  const match = content.trim().match(/^([a-zA-ZčćžšđČĆŽŠĐ]+)\s*(?:x\s*)?(\d+)$/i);
   if (!match) return null;
 
   const cropKey = normalizeCropName(match[1]);
   const amount = parseInt(match[2], 10);
 
-  if (!CROPS[cropKey]) return null;
+  if (!cropKey) return null;
   if (!Number.isInteger(amount) || amount <= 0) return null;
 
   return { cropKey, amount };
@@ -108,11 +110,8 @@ async function sendHarvestMessage(row) {
   const channel = await guild.channels.fetch(row.channelId).catch(() => null);
   if (!channel || !channel.isTextBased()) return;
 
-  const crop = CROPS[row.cropKey];
-  if (!crop) return;
-
   const embed = buildHarvestEmbed({
-    cropName: crop.displayName,
+    cropName: formatCropName(row.cropKey),
     amount: row.amount,
     userId: row.userId,
     plantedAt: row.plantedAt,
@@ -130,6 +129,7 @@ function scheduleHarvest(row) {
 
   const timeout = setTimeout(async () => {
     await sendHarvestMessage(row);
+    activeTimers.delete(row.id);
   }, delay);
 
   activeTimers.set(row.id, timeout);
@@ -144,9 +144,8 @@ client.on("messageCreate", async (message) => {
   const parsed = parsePlantMessage(message.content);
   if (!parsed) return;
 
-  const crop = CROPS[parsed.cropKey];
   const plantedAt = Date.now();
-  const harvestAt = plantedAt + crop.growTimeMs;
+  const harvestAt = plantedAt + GROW_TIME_MS;
 
   const saved = await insertPlanting({
     guildId: message.guild.id,
@@ -164,7 +163,7 @@ client.on("messageCreate", async (message) => {
   await message.react("✅").catch(() => null);
 
   const embed = buildPlantEmbed({
-    cropName: crop.displayName,
+    cropName: formatCropName(parsed.cropKey),
     amount: parsed.amount,
     userId: message.author.id,
     plantedAt,
