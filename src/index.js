@@ -25,7 +25,7 @@ const FARM_CHANNEL_ID = process.env.FARM_CHANNEL_ID;
 const HARVEST_ROLE_ID = process.env.HARVEST_ROLE_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
-const GROW_TIME_MS = 5 * 60 * 60 * 1000;
+const GROW_TIME_MS = 30 * 1000;
 const activeTimers = new Map();
 const harvestedPlantings = new Set();
 
