@@ -24,6 +24,7 @@ const client = new Client({
 const FARM_CHANNEL_ID = process.env.FARM_CHANNEL_ID;
 const HARVEST_ROLE_ID = process.env.HARVEST_ROLE_ID;
 const GUILD_ID = process.env.GUILD_ID;
+const HARVEST_CHANNEL_ID = "1487121637454381243";
 
 const GROW_TIME_MS = 30 * 1000;
 const activeTimers = new Map();
@@ -38,7 +39,7 @@ function formatCropName(input) {
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
-// Podrzava:
+// podrzava:
 // cvetx5
 // cvet x 5
 // cvet 5
@@ -136,13 +137,16 @@ function buildHarvestedEmbed({
 }) {
   const embed = new EmbedBuilder()
     .setTitle("✅ Obrano!")
-    .setDescription(`<@${harvestedByUserId}> je obrao/la sadnju od <@${plantedUserId}>.`)
+    .setDescription(
+      `<@${harvestedByUserId}> je obrao/la sadnju od <@${plantedUserId}>.`
+    )
     .addFields(
       { name: "🌿 Vrsta", value: cropName, inline: true },
       { name: "📦 Količina", value: String(amount), inline: true },
       { name: "🕒 Posađeno", value: discordTime(plantedAt), inline: true },
       { name: "⏰ Bilo spremno", value: discordTime(harvestAt), inline: true },
       { name: "🧺 Obrano", value: discordTime(harvestedAt), inline: true },
+      { name: "👨‍🌾 Obrao", value: `<@${harvestedByUserId}>`, inline: true },
       { name: "📍 Lokacija", value: "Ranch", inline: true }
     )
     .setColor(0x5865f2);
@@ -200,7 +204,7 @@ async function sendHarvestMessage(row) {
   const guild = await client.guilds.fetch(row.guildId).catch(() => null);
   if (!guild) return;
 
-  const channel = await guild.channels.fetch(row.channelId).catch(() => null);
+  const channel = await guild.channels.fetch(HARVEST_CHANNEL_ID).catch(() => null);
   if (!channel || !channel.isTextBased()) return;
 
   const embed = buildHarvestEmbed({
@@ -212,8 +216,12 @@ async function sendHarvestMessage(row) {
     imageUrl: row.imageUrl || null
   });
 
+  const content = HARVEST_ROLE_ID
+    ? `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`
+    : `<@${row.userId}>`;
+
   await channel.send({
-    content: `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`,
+    content,
     embeds: [embed],
     components: [buildHarvestButton(row.id)]
   });
@@ -299,27 +307,36 @@ client.on("interactionCreate", async (interaction) => {
 
   const vrsta = fieldMap.get("🌿 Vrsta") || "Nepoznato";
   const kolicina = fieldMap.get("📦 Količina") || "0";
-  const posadjeno = fieldMap.get("🕒 Posađeno") || "Nepoznato";
-  const spremno = fieldMap.get("✅ Spremno") || fieldMap.get("⏰ Bilo spremno") || "Nepoznato";
   const plantedUserMatch = interaction.message.content.match(/<@(\d+)>/);
   const plantedUserId = plantedUserMatch ? plantedUserMatch[1] : interaction.user.id;
 
-  const editedEmbed = new EmbedBuilder()
-    .setTitle("✅ Obrano!")
-    .setDescription(`<@${interaction.user.id}> je obrao/la sadnju od <@${plantedUserId}>.`)
-    .addFields(
-      { name: "🌿 Vrsta", value: vrsta, inline: true },
-      { name: "📦 Količina", value: kolicina, inline: true },
-      { name: "🕒 Posađeno", value: posadjeno, inline: true },
-      { name: "⏰ Bilo spremno", value: spremno, inline: true },
-      { name: "🧺 Obrano", value: discordTime(Date.now()), inline: true },
-      { name: "📍 Lokacija", value: "Ranch", inline: true }
-    )
-    .setColor(0x5865f2);
+  let plantedAt = Date.now();
+  let harvestAt = Date.now();
 
-  if (existingImage) {
-    editedEmbed.setImage(existingImage);
+  const readyField = fieldMap.get("✅ Spremno") || fieldMap.get("⏰ Bilo spremno");
+  const plantedField = fieldMap.get("🕒 Posađeno");
+
+  const plantedTimestampMatch = plantedField?.match(/<t:(\d+):[a-z]>/i);
+  const readyTimestampMatch = readyField?.match(/<t:(\d+):[a-z]>/i);
+
+  if (plantedTimestampMatch) {
+    plantedAt = Number(plantedTimestampMatch[1]) * 1000;
   }
+
+  if (readyTimestampMatch) {
+    harvestAt = Number(readyTimestampMatch[1]) * 1000;
+  }
+
+  const editedEmbed = buildHarvestedEmbed({
+    cropName: vrsta,
+    amount: kolicina,
+    plantedUserId,
+    harvestedByUserId: interaction.user.id,
+    plantedAt,
+    harvestAt,
+    harvestedAt: Date.now(),
+    imageUrl: existingImage
+  });
 
   await interaction.update({
     content: `✅ Obrano od strane <@${interaction.user.id}>`,
