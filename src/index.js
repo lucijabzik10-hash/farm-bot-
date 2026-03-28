@@ -188,9 +188,4 @@ if (!token) {
 console.log("DISCORD_TOKEN postoji:", true);
 console.log("Duzina tokena:", token.length);
 
-if (!token.includes(".")) {
-  console.error("Pogrešan token (nije Discord bot token)");
-  process.exit(1);
-}
-
 client.login(token);
