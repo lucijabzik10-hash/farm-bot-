@@ -289,3 +289,19 @@ console.log("DISCORD_TOKEN postoji:", !!process.env.DISCORD_TOKEN);
 console.log("Duzina tokena:", process.env.DISCORD_TOKEN.trim().length);
 
 client.login(process.env.DISCORD_TOKEN.trim());
+const token = process.env.DISCORD_TOKEN?.trim();
+
+if (!token) {
+  console.error("DISCORD_TOKEN nije postavljen.");
+  process.exit(1);
+}
+
+if (!token.includes(".")) {
+  console.error("DISCORD_TOKEN ne izgleda kao Discord bot token. Vjerovatno si stavio pogrešan key.");
+  process.exit(1);
+}
+
+console.log("DISCORD_TOKEN postoji:", true);
+console.log("Duzina tokena:", token.length);
+
+client.login(token);
