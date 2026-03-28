@@ -34,13 +34,10 @@ function formatCropName(input) {
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
-// 🔥 DINAMIČKA SLIKA PO BILJCI
-function getCropImage(cropKey) {
-  const query = encodeURIComponent(cropKey);
-  return `https://source.unsplash.com/1200x600/?${query},plant,farm`;
-}
-
-// 🔥 PARSER (cvet x 5, cvet5, cvet 5)
+// Podrzava:
+// cvetx5
+// cvet x 5
+// cvet 5
 function parsePlantMessage(content) {
   const match = content.trim().match(/^([a-zA-ZčćžšđČĆŽŠĐ]+)\s*(?:x\s*)?(\d+)$/i);
   if (!match) return null;
@@ -58,42 +55,85 @@ function discordTime(ms, format = "f") {
   return `<t:${Math.floor(ms / 1000)}:${format}>`;
 }
 
-// 🌱 PLANT EMBED
-function buildPlantEmbed({ cropName, cropKey, amount, userId, plantedAt, harvestAt }) {
-  return new EmbedBuilder()
+function getMessageImage(message) {
+  const attachment = message.attachments.find(att => {
+    if (!att.contentType) {
+      return /\.(png|jpe?g|gif|webp)$/i.test(att.name || "");
+    }
+    return att.contentType.startsWith("image/");
+  });
+
+  return attachment ? attachment.url : null;
+}
+
+function buildPlantEmbed({
+  cropName,
+  amount,
+  userId,
+  plantedAt,
+  harvestAt,
+  imageUrl
+}) {
+  const embed = new EmbedBuilder()
     .setTitle("🌱 Sadnja zabeležena!")
     .setDescription(`<@${userId}> je posadio/la.`)
     .addFields(
-      { name: "🌿 Sadnica", value: `${cropName} x ${amount}`, inline: true },
+      { name: "🌿 Vrsta", value: cropName, inline: true },
+      { name: "📦 Količina", value: String(amount), inline: true },
       { name: "🕒 Posađeno", value: discordTime(plantedAt), inline: true },
       { name: "⏰ Berba", value: discordTime(harvestAt), inline: true },
-      { name: "📍 Lokacija", value: "Ranch", inline: false }
+      { name: "📍 Lokacija", value: "Ranch", inline: true }
     )
-    .setImage(getCropImage(cropKey))
     .setColor(0x57f287);
+
+  if (imageUrl) {
+    embed.setImage(imageUrl);
+  }
+
+  return embed;
 }
 
-// 🚨 HARVEST EMBED
-function buildHarvestEmbed({ cropName, cropKey, amount, userId, plantedAt, harvestAt }) {
-  return new EmbedBuilder()
+function buildHarvestEmbed({
+  cropName,
+  amount,
+  userId,
+  plantedAt,
+  harvestAt,
+  imageUrl
+}) {
+  const embed = new EmbedBuilder()
     .setTitle("🚨 Spremno za branje!")
     .setDescription(`<@${userId}> spremno je za branje.`)
     .addFields(
-      { name: "🌿 Sadnica", value: `${cropName} x ${amount}`, inline: true },
+      { name: "🌿 Vrsta", value: cropName, inline: true },
+      { name: "📦 Količina", value: String(amount), inline: true },
       { name: "🕒 Posađeno", value: discordTime(plantedAt), inline: true },
       { name: "✅ Spremno", value: discordTime(harvestAt), inline: true },
-      { name: "📍 Lokacija", value: "Ranch", inline: false }
+      { name: "📍 Lokacija", value: "Ranch", inline: true }
     )
-    .setImage(getCropImage(cropKey))
     .setColor(0xed4245);
+
+  if (imageUrl) {
+    embed.setImage(imageUrl);
+  }
+
+  return embed;
 }
 
-// 💾 DB INSERT
 function insertPlanting(data) {
   return new Promise((resolve, reject) => {
     db.run(
-      `INSERT INTO plantings (guild_id, channel_id, user_id, message_id, crop_key, amount, planted_at, harvest_at, harvested)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      `INSERT INTO plantings (
+        guild_id,
+        channel_id,
+        user_id,
+        message_id,
+        crop_key,
+        amount,
+        planted_at,
+        harvest_at,
+        harvested
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
       [
         data.guildId,
         data.channelId,
@@ -112,7 +152,6 @@ function insertPlanting(data) {
   });
 }
 
-// 📩 HARVEST MESSAGE
 async function sendHarvestMessage(row) {
   const guild = await client.guilds.fetch(row.guildId).catch(() => null);
   if (!guild) return;
@@ -122,11 +161,11 @@ async function sendHarvestMessage(row) {
 
   const embed = buildHarvestEmbed({
     cropName: formatCropName(row.cropKey),
-    cropKey: row.cropKey,
     amount: row.amount,
     userId: row.userId,
     plantedAt: row.plantedAt,
-    harvestAt: row.harvestAt
+    harvestAt: row.harvestAt,
+    imageUrl: row.imageUrl || null
   });
 
   await channel.send({
@@ -135,7 +174,6 @@ async function sendHarvestMessage(row) {
   });
 }
 
-// ⏱ TIMER
 function scheduleHarvest(row) {
   const delay = Math.max(0, row.harvestAt - Date.now());
 
@@ -147,7 +185,6 @@ function scheduleHarvest(row) {
   activeTimers.set(row.id, timeout);
 }
 
-// 💬 MESSAGE HANDLER
 client.on("messageCreate", async (message) => {
   if (!message.guild) return;
   if (message.author.bot) return;
@@ -159,6 +196,7 @@ client.on("messageCreate", async (message) => {
 
   const plantedAt = Date.now();
   const harvestAt = plantedAt + GROW_TIME_MS;
+  const imageUrl = getMessageImage(message);
 
   const saved = await insertPlanting({
     guildId: message.guild.id,
@@ -168,8 +206,11 @@ client.on("messageCreate", async (message) => {
     cropKey: parsed.cropKey,
     amount: parsed.amount,
     plantedAt,
-    harvestAt
+    harvestAt,
+    imageUrl
   });
+
+  saved.imageUrl = imageUrl;
 
   scheduleHarvest(saved);
 
@@ -177,17 +218,16 @@ client.on("messageCreate", async (message) => {
 
   const embed = buildPlantEmbed({
     cropName: formatCropName(parsed.cropKey),
-    cropKey: parsed.cropKey,
     amount: parsed.amount,
     userId: message.author.id,
     plantedAt,
-    harvestAt
+    harvestAt,
+    imageUrl
   });
 
   await message.channel.send({ embeds: [embed] });
 });
 
-// 🚀 READY
 client.once("clientReady", () => {
   console.log(`Bot online kao ${client.user.tag}`);
 });
