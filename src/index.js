@@ -280,4 +280,12 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-client.login(DISCORD_TOKEN);
+if (!process.env.DISCORD_TOKEN) {
+  console.error("DISCORD_TOKEN nije postavljen u Railway Variables.");
+  process.exit(1);
+}
+
+console.log("DISCORD_TOKEN postoji:", !!process.env.DISCORD_TOKEN);
+console.log("Duzina tokena:", process.env.DISCORD_TOKEN.trim().length);
+
+client.login(process.env.DISCORD_TOKEN.trim());
