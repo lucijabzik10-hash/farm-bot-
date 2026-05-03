@@ -24,6 +24,8 @@ const client = new Client({
 const FARM_CHANNEL_ID = process.env.FARM_CHANNEL_ID;
 const HARVEST_ROLE_ID = process.env.HARVEST_ROLE_ID;
 const GUILD_ID = process.env.GUILD_ID;
+
+// HARVEST KANALI NA 2 RAZLIČITA SERVERA
 const HARVEST_CHANNEL_ID_1 = "1487121637454381243";
 const HARVEST_CHANNEL_ID_2 = "1487810730857074790";
 
@@ -40,10 +42,6 @@ function formatCropName(input) {
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
-// podrzava:
-// cvetx5
-// cvet x 5
-// cvet 5
 function parsePlantMessage(content) {
   const match = content.trim().match(/^([a-zA-ZčćžšđČĆŽŠĐ]+)\s*(?:x\s*)?(\d+)$/i);
   if (!match) return null;
@@ -66,6 +64,7 @@ function getMessageImage(message) {
     if (!att.contentType) {
       return /\.(png|jpe?g|gif|webp)$/i.test(att.name || "");
     }
+
     return att.contentType.startsWith("image/");
   });
 
@@ -202,11 +201,10 @@ function insertPlanting(data) {
 }
 
 async function sendHarvestMessage(row) {
-  const guild = await client.guilds.fetch(row.guildId).catch(() => null);
-  if (!guild) return;
-
-  const channel = await guild.channels.fetch(HARVEST_CHANNEL_ID).catch(() => null);
-  if (!channel || !channel.isTextBased()) return;
+  const harvestChannelIds = [
+    HARVEST_CHANNEL_ID_1,
+    HARVEST_CHANNEL_ID_2
+  ];
 
   const embed = buildHarvestEmbed({
     cropName: formatCropName(row.cropKey),
@@ -221,11 +219,22 @@ async function sendHarvestMessage(row) {
     ? `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`
     : `<@${row.userId}>`;
 
-  await channel.send({
-    content,
-    embeds: [embed],
-    components: [buildHarvestButton(row.id)]
-  });
+  for (const channelId of harvestChannelIds) {
+    const channel = await client.channels.fetch(channelId).catch(() => null);
+
+    if (!channel || !channel.isTextBased()) {
+      console.log(`Harvest kanal nije pronađen ili nije text kanal: ${channelId}`);
+      continue;
+    }
+
+    await channel.send({
+      content,
+      embeds: [embed],
+      components: [buildHarvestButton(row.id)]
+    }).catch(err => {
+      console.error(`Greška pri slanju u harvest kanal ${channelId}:`, err);
+    });
+  }
 }
 
 function scheduleHarvest(row) {
@@ -302,19 +311,26 @@ client.on("interactionCreate", async (interaction) => {
   const existingImage = embed?.image?.url || null;
 
   const fieldMap = new Map();
+
   for (const field of embed?.fields || []) {
     fieldMap.set(field.name, field.value);
   }
 
   const vrsta = fieldMap.get("🌿 Vrsta") || "Nepoznato";
   const kolicina = fieldMap.get("📦 Količina") || "0";
+
   const plantedUserMatch = interaction.message.content.match(/<@(\d+)>/);
-  const plantedUserId = plantedUserMatch ? plantedUserMatch[1] : interaction.user.id;
+  const plantedUserId = plantedUserMatch
+    ? plantedUserMatch[1]
+    : interaction.user.id;
 
   let plantedAt = Date.now();
   let harvestAt = Date.now();
 
-  const readyField = fieldMap.get("✅ Spremno") || fieldMap.get("⏰ Bilo spremno");
+  const readyField =
+    fieldMap.get("✅ Spremno") ||
+    fieldMap.get("⏰ Bilo spremno");
+
   const plantedField = fieldMap.get("🕒 Posađeno");
 
   const plantedTimestampMatch = plantedField?.match(/<t:(\d+):[a-z]>/i);
