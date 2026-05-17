@@ -7,7 +7,8 @@ const {
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  StringSelectMenuBuilder
 } = require("discord.js");
 
 const db = require("./db");
@@ -25,11 +26,14 @@ const FARM_CHANNEL_ID = process.env.FARM_CHANNEL_ID;
 const HARVEST_ROLE_ID = process.env.HARVEST_ROLE_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
-// HARVEST KANALI
 const HARVEST_CHANNEL_ID_1 = "1487121637454381243";
 const HARVEST_CHANNEL_ID_2 = "1487810730857074790";
 
-const GROW_TIME_MS = 9000000;
+const PLANT_TIMES = {
+  "plant_1h45": 105 * 60 * 1000,
+  "plant_3h": 3 * 60 * 60 * 1000,
+  "plant_4h": 4 * 60 * 60 * 1000
+};
 
 const activeTimers = new Map();
 const harvestedPlantings = new Set();
@@ -47,12 +51,6 @@ function formatCropName(input) {
     .join(" ");
 }
 
-/*
-  PRIMA:
-  belo grozdje 5
-  belo grozdje x5
-  crno grozdje 12
-*/
 function parsePlantMessage(content) {
   const match = content
     .trim()
@@ -89,6 +87,31 @@ function getMessageImage(message) {
   });
 
   return attachment ? attachment.url : null;
+}
+
+function buildPlantTimeMenu(messageId) {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`planttime_${messageId}`)
+      .setPlaceholder("Izaberi vreme sadnje")
+      .addOptions(
+        {
+          label: "1h i 45 min",
+          value: "plant_1h45",
+          emoji: "⏱️"
+        },
+        {
+          label: "3h",
+          value: "plant_3h",
+          emoji: "⏱️"
+        },
+        {
+          label: "4h",
+          value: "plant_4h",
+          emoji: "⏱️"
+        }
+      )
+  );
 }
 
 function buildPlantEmbed({
@@ -320,9 +343,6 @@ async function sendHarvestMessage(row) {
       .catch(() => null);
 
     if (!channel || !channel.isTextBased()) {
-      console.log(
-        `Harvest kanal nije pronađen ili nije text kanal: ${channelId}`
-      );
       continue;
     }
 
@@ -330,12 +350,7 @@ async function sendHarvestMessage(row) {
       content,
       embeds: [embed],
       components: [buildHarvestButton(row.id)]
-    }).catch(err => {
-      console.error(
-        `Greška pri slanju u harvest kanal ${channelId}:`,
-        err
-      );
-    });
+    }).catch(console.error);
   }
 }
 
@@ -369,40 +384,11 @@ client.on("messageCreate", async (message) => {
 
     if (!parsed) return;
 
-    const plantedAt = Date.now();
-    const harvestAt = plantedAt + GROW_TIME_MS;
-
-    const imageUrl = getMessageImage(message);
-
-    const saved = await insertPlanting({
-      guildId: message.guild.id,
-      channelId: message.channel.id,
-      userId: message.author.id,
-      messageId: message.id,
-      cropKey: parsed.cropKey,
-      amount: parsed.amount,
-      plantedAt,
-      harvestAt,
-      imageUrl
-    });
-
-    saved.imageUrl = imageUrl;
-
-    scheduleHarvest(saved);
-
     await message.react("✅").catch(() => null);
 
-    const embed = buildPlantEmbed({
-      cropName: formatCropName(parsed.cropKey),
-      amount: parsed.amount,
-      userId: message.author.id,
-      plantedAt,
-      harvestAt,
-      imageUrl
-    });
-
     await message.channel.send({
-      embeds: [embed]
+      content: `<@${message.author.id}> izaberi vreme sadnje za **${formatCropName(parsed.cropKey)} x${parsed.amount}**:`,
+      components: [buildPlantTimeMenu(message.id)]
     });
 
   } catch (err) {
@@ -412,6 +398,94 @@ client.on("messageCreate", async (message) => {
 
 client.on("interactionCreate", async (interaction) => {
   try {
+
+    if (interaction.isStringSelectMenu()) {
+
+      if (!interaction.customId.startsWith("planttime_")) {
+        return;
+      }
+
+      const growTime = PLANT_TIMES[interaction.values[0]];
+
+      if (!growTime) {
+        await interaction.reply({
+          content: "Nepoznato vreme sadnje.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const originalMessageId =
+        interaction.customId.replace(
+          "planttime_",
+          ""
+        );
+
+      const originalMessage =
+        await interaction.channel.messages
+          .fetch(originalMessageId)
+          .catch(() => null);
+
+      if (!originalMessage) {
+        await interaction.reply({
+          content: "Ne mogu pronaći originalnu poruku.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const parsed = parsePlantMessage(
+        originalMessage.content
+      );
+
+      if (!parsed) {
+        await interaction.reply({
+          content: "Neispravna sadnja.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const plantedAt = Date.now();
+      const harvestAt = plantedAt + growTime;
+
+      const imageUrl =
+        getMessageImage(originalMessage);
+
+      const saved = await insertPlanting({
+        guildId: interaction.guild.id,
+        channelId: interaction.channel.id,
+        userId: originalMessage.author.id,
+        messageId: originalMessage.id,
+        cropKey: parsed.cropKey,
+        amount: parsed.amount,
+        plantedAt,
+        harvestAt,
+        imageUrl
+      });
+
+      saved.imageUrl = imageUrl;
+
+      scheduleHarvest(saved);
+
+      const embed = buildPlantEmbed({
+        cropName: formatCropName(parsed.cropKey),
+        amount: parsed.amount,
+        userId: originalMessage.author.id,
+        plantedAt,
+        harvestAt,
+        imageUrl
+      });
+
+      await interaction.update({
+        content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
+        embeds: [embed],
+        components: []
+      });
+
+      return;
+    }
+
     if (!interaction.isButton()) return;
 
     if (!interaction.customId.startsWith("obrano_")) {
@@ -526,8 +600,5 @@ if (!token) {
 
   process.exit(1);
 }
-
-console.log("DISCORD_TOKEN postoji:", true);
-console.log("Dužina tokena:", token.length);
 
 client.login(token);
