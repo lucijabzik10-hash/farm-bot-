@@ -30,7 +30,7 @@ const HARVEST_CHANNEL_ID_1 = "1487121637454381243";
 const HARVEST_CHANNEL_ID_2 = "1487810730857074790";
 
 const PLANT_TIMES = {
-  "plant_1h45": 105 * 60 * 1000,
+  "plant_2h": 2 * 60 * 60 * 1000,
   "plant_3h": 3 * 60 * 60 * 1000,
   "plant_4h": 4 * 60 * 60 * 1000
 };
@@ -96,8 +96,8 @@ function buildPlantTimeMenu(messageId) {
       .setPlaceholder("Izaberi vreme sadnje")
       .addOptions(
         {
-          label: "1h i 45 min",
-          value: "plant_1h45",
+          label: "2h",
+          value: "plant_2h",
           emoji: "⏱️"
         },
         {
