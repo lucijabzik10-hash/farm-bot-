@@ -35,6 +35,61 @@ const PLANT_TIMES = {
   "plant_4h": 4 * 60 * 60 * 1000
 };
 
+const PLANT_TIME_TEXT = `**Vreme trajanja sadnje:**
+
+PAMUK: 3 H ✓
+
+CVEKLA: 1 H I 45 MIN
+
+HMELJ: 3 H ✓
+
+REPA: 3 H ✓
+
+KAFA: 3 H
+
+JAGODA:
+
+BRESKVA:
+
+NARANDZA:
+
+KRUSKA:
+
+LIMUN:
+
+KUKURUZ: 4 H
+
+PASULJ: 2 H ✓
+
+ZITO: 3 H
+
+PIRINAC:
+
+SECERNA TRSKA: 2 H ✓
+
+CRNO GROZDJE: 4 H ✓
+
+BELO GROZDJE: 4 H ✓
+
+KRUMPIR: 1 H I 45 MIN
+
+PARADAJZ: 1 H I 45 MIN
+
+KUPUS: 1 H I 45 MIN
+
+BELI LUK: 2 H ✓
+
+LUK:
+
+PAPRIKA: 1 H I 45 MIN
+
+JABUKA: 4 H ✓
+
+20% je 4h
+40% je 3h
+60% je 2h
+85% je 45 min`;
+
 const activeTimers = new Map();
 const harvestedPlantings = new Set();
 
@@ -387,7 +442,9 @@ client.on("messageCreate", async (message) => {
     await message.react("✅").catch(() => null);
 
     await message.channel.send({
-      content: `<@${message.author.id}> izaberi vreme sadnje za **${formatCropName(parsed.cropKey)} x${parsed.amount}**:`,
+      content: `${PLANT_TIME_TEXT}
+
+<@${message.author.id}> izaberi vreme sadnje za **${formatCropName(parsed.cropKey)} x${parsed.amount}**:`,
       components: [buildPlantTimeMenu(message.id)]
     });
 
