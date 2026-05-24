@@ -35,27 +35,27 @@ const PLANT_TIMES = {
   "plant_4h": 4 * 60 * 60 * 1000
 };
 
-const PLANT_TIME_TEXT = `**Vreme trajanja sadnje:**
+const PLANT_TIME_TEXT = `***Vreme trajanja sadnje:
 
 PAMUK: 3 H ✓
 
-CVEKLA: 1 H I 45 MIN
+CVEKLA: 2 H ✓
 
-HMELJ: 3 H ✓
+HMELJ:  3 H ✓
 
 REPA: 3 H ✓
 
-KAFA: 3 H
+KAFA: 2 H ✓
 
-JAGODA:
+JAGODA: 4 H ✓
 
 BRESKVA:
 
-NARANDZA:
+NARANDZA: 4 H ✓
 
-KRUSKA:
+KRUSKA:  4 H ✓
 
-LIMUN:
+LIMUN: 4 H ✓
 
 KUKURUZ: 4 H
 
@@ -63,7 +63,7 @@ PASULJ: 2 H ✓
 
 ZITO: 3 H
 
-PIRINAC:
+PIRINAC: 2 H ✓
 
 SECERNA TRSKA: 2 H ✓
 
@@ -71,24 +71,23 @@ CRNO GROZDJE: 4 H ✓
 
 BELO GROZDJE: 4 H ✓
 
-KRUMPIR: 1 H I 45 MIN
+KRUMPIR:  2 H ✓
 
-PARADAJZ: 1 H I 45 MIN
+PARADAJZ: 2 H ✓
 
 KUPUS: 1 H I 45 MIN
 
 BELI LUK: 2 H ✓
 
-LUK:
+LUK: 2 H ✓
 
 PAPRIKA: 1 H I 45 MIN
 
 JABUKA: 4 H ✓
 
 20% je 4h
-40% je 3h
-60% je 2h
-85% je 45 min`;
+40% je 3h 
+60% je 2h***`;
 
 const activeTimers = new Map();
 const harvestedPlantings = new Set();
