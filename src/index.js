@@ -30,7 +30,9 @@ const HARVEST_CHANNEL_ID_1 = "1487121637454381243";
 const HARVEST_CHANNEL_ID_2 = "1487810730857074790";
 
 const PLANT_TIMES = {
-  "plant_35": 195 * 60 * 1000, // 3h 15min
+  "plant_20": 240 * 60 * 1000, // 4h
+  "plant_25": 225 * 60 * 1000, // 3h 45min
+  "plant_30": 210 * 60 * 1000, // 3h 30min"plant_35": 195 * 60 * 1000, // 3h 15min
   "plant_40": 180 * 60 * 1000, // 3h
   "plant_45": 165 * 60 * 1000, // 2h 45min
   "plant_50": 150 * 60 * 1000, // 2h 30min
@@ -44,6 +46,9 @@ const PLANT_TIMES = {
 
 const PLANT_TIME_TEXT = `***Vreme trajanja sadnje:
 
+20% = 4h
+25% = 3h 45min
+30% = 3h 30min
 35% =	3h 15min
 40%	= 3h
 45%	= 2h 45min
@@ -115,6 +120,9 @@ function buildPlantTimeMenu(messageId) {
       .setCustomId(`planttime_${messageId}`)
       .setPlaceholder("Izaberi postotak sadnje")
       .addOptions(
+        { label: "20% - 4h", value: "plant_20", emoji: "🌱" },
+        { label: "25% - 3h 45min", value: "plant_25", emoji: "🌱" },
+        { label: "30% - 3h 30min", value: "plant_30", emoji: "🌱" },
         { label: "35% - 3h 15min", value: "plant_35", emoji: "🌱" },
         { label: "40% - 3h", value: "plant_40", emoji: "🌱" },
         { label: "45% - 2h 45min", value: "plant_45", emoji: "🌱" },
