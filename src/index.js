@@ -30,30 +30,30 @@ const HARVEST_CHANNEL_ID_1 = "1487121637454381243";
 const HARVEST_CHANNEL_ID_2 = "1487810730857074790";
 
 const PLANT_TIMES = {
-  "plant_35": 105 * 60 * 1000,
-  "plant_40": 120 * 60 * 1000,
-  "plant_45": 135 * 60 * 1000,
-  "plant_50": 150 * 60 * 1000,
-  "plant_55": 165 * 60 * 1000,
-  "plant_60": 180 * 60 * 1000,
-  "plant_65": 195 * 60 * 1000,
-  "plant_70": 210 * 60 * 1000,
-  "plant_75": 225 * 60 * 1000,
-  "plant_80": 240 * 60 * 1000
+  "plant_35": 195 * 60 * 1000, // 3h 15min
+  "plant_40": 180 * 60 * 1000, // 3h
+  "plant_45": 165 * 60 * 1000, // 2h 45min
+  "plant_50": 150 * 60 * 1000, // 2h 30min
+  "plant_55": 135 * 60 * 1000, // 2h 15min
+  "plant_60": 120 * 60 * 1000, // 2h
+  "plant_65": 105 * 60 * 1000, // 1h 45min
+  "plant_70": 90 * 60 * 1000,  // 1h 30min
+  "plant_75": 75 * 60 * 1000,  // 1h 15min
+  "plant_80": 60 * 60 * 1000   // 1h
 };
 
 const PLANT_TIME_TEXT = `***Vreme trajanja sadnje:
 
-35% = 1h 45min
-40% = 2h
-45% = 2h 15min
-50% = 2h 30min
-55% = 2h 45min
-60% = 3h
-65% = 3h 15min
-70% = 3h 30min
-75% = 3h 45min
-80% = 4h***`;
+35% =	3h 15min
+40%	= 3h
+45%	= 2h 45min
+50%	= 2h 30min
+55%	= 2h 15min
+60%	= 2h
+65%	= 1h 45min
+70%	= 1h 30min
+75%	= 1h 15min
+80%	= 1h***`;
 
 const activeTimers = new Map();
 const harvestedPlantings = new Set();
@@ -113,58 +113,18 @@ function buildPlantTimeMenu(messageId) {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`planttime_${messageId}`)
-      .setPlaceholder("Izaberi procenat sadnje")
+      .setPlaceholder("Izaberi postotak sadnje")
       .addOptions(
-        {
-          label: "35% - 1h 45min",
-          value: "plant_35",
-          emoji: "🌱"
-        },
-        {
-          label: "40% - 2h",
-          value: "plant_40",
-          emoji: "🌱"
-        },
-        {
-          label: "45% - 2h 15min",
-          value: "plant_45",
-          emoji: "🌱"
-        },
-        {
-          label: "50% - 2h 30min",
-          value: "plant_50",
-          emoji: "🌱"
-        },
-        {
-          label: "55% - 2h 45min",
-          value: "plant_55",
-          emoji: "🌱"
-        },
-        {
-          label: "60% - 3h",
-          value: "plant_60",
-          emoji: "🌱"
-        },
-        {
-          label: "65% - 3h 15min",
-          value: "plant_65",
-          emoji: "🌱"
-        },
-        {
-          label: "70% - 3h 30min",
-          value: "plant_70",
-          emoji: "🌱"
-        },
-        {
-          label: "75% - 3h 45min",
-          value: "plant_75",
-          emoji: "🌱"
-        },
-        {
-          label: "80% - 4h",
-          value: "plant_80",
-          emoji: "🌱"
-        }
+        { label: "35% - 3h 15min", value: "plant_35", emoji: "🌱" },
+        { label: "40% - 3h", value: "plant_40", emoji: "🌱" },
+        { label: "45% - 2h 45min", value: "plant_45", emoji: "🌱" },
+        { label: "50% - 2h 30min", value: "plant_50", emoji: "🌱" },
+        { label: "55% - 2h 15min", value: "plant_55", emoji: "🌱" },
+        { label: "60% - 2h", value: "plant_60", emoji: "🌱" },
+        { label: "65% - 1h 45min", value: "plant_65", emoji: "🌱" },
+        { label: "70% - 1h 30min", value: "plant_70", emoji: "🌱" },
+        { label: "75% - 1h 15min", value: "plant_75", emoji: "🌱" },
+        { label: "80% - 1h", value: "plant_80", emoji: "🌱" }
       )
   );
 }
