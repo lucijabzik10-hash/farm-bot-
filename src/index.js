@@ -33,7 +33,8 @@ const DAILY_REPORT_CHANNEL_ID = "1518237730029437241";
 const PLANT_TIMES = {
   "plant_20": 240 * 60 * 1000, // 4h
   "plant_25": 225 * 60 * 1000, // 3h 45min
-  "plant_30": 210 * 60 * 1000, // 3h 30min"plant_35": 195 * 60 * 1000, // 3h 15min
+  "plant_30": 210 * 60 * 1000, // 3h 30min
+  "plant_35": 195 * 60 * 1000, // 3h 15min
   "plant_40": 180 * 60 * 1000, // 3h
   "plant_45": 165 * 60 * 1000, // 2h 45min
   "plant_50": 150 * 60 * 1000, // 2h 30min
