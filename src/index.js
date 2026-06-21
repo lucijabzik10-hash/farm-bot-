@@ -37,6 +37,7 @@ const PLANT_TIMES = {
   plant_75: 75 * 60 * 1000,
   plant_80: 60 * 60 * 1000,
   plant_85: 45 * 60 * 1000
+  plant_95: 15 * 60 * 1000
 };
 
 const activeIntervals = new Map();
@@ -96,6 +97,7 @@ function buildPlantTimeMenu(messageId) {
         { label: "75% - 1h 15min", value: "plant_75" },
         { label: "80% - 1h", value: "plant_80" },
         { label: "85% - 45min", value: "plant_85" }
+        { label: "95% - 15min", value: "plant_95" }
       )
   );
 }
