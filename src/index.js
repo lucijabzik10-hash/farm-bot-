@@ -623,61 +623,81 @@ client.on("interactionCreate", async (interaction) => {
           ephemeral: true
         });
         return;
-      }
 
-      const plantedAt = Date.now();
-      const harvestAt = plantedAt + growTime;
 
-      const imageUrl =
-        getMessageImage(originalMessage);
+if (interaction.isStringSelectMenu()) {
+  if (!interaction.customId.startsWith("planttime_")) return;
 
-      const saved = await insertPlanting({
-        guildId: interaction.guild.id,
-        channelId: interaction.channel.id,
-        userId: originalMessage.author.id,
-        messageId: originalMessage.id,
-        cropKey: parsed.cropKey,
-        amount: parsed.amount,
-        plantedAt,
-        harvestAt,
-        imageUrl
-      });
+  await interaction.deferUpdate(); // 🔥 KLJUČNO DA RADI EDIT PORUKE
 
-      await incrementUserPlantings(
-        originalMessage.author.id
-      );
+  try {
+    const growTime = PLANT_TIMES[interaction.values[0]];
 
-      await incrementTotalPlantings(
-        originalMessage.author.id
-      );
-
-      const totalPlantings =
-        await getTotalPlantings(
-          originalMessage.author.id
-        );
-
-      saved.imageUrl = imageUrl;
-
-      scheduleHarvest(saved);
-
-      const embed = buildPlantEmbed({
-  cropName: formatCropName(parsed.cropKey),
-  amount: parsed.amount,
-  userId: originalMessage.author.id,
-  plantedAt,
-  harvestAt,
-  imageUrl,
-  totalPlantings
-});
-
-await interaction.update({
-  content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
-  embeds: [embed],
-  components: []
-});
-
-return;
+    if (!growTime) {
+      return; // već deferred, ne treba followUp
     }
+
+    const originalMessageId =
+      interaction.customId.replace("planttime_", "");
+
+    const originalMessage =
+      await interaction.channel.messages
+        .fetch(originalMessageId)
+        .catch(() => null);
+
+    if (!originalMessage) return;
+
+    const parsed = parsePlantMessage(originalMessage.content);
+    if (!parsed) return;
+
+    const plantedAt = Date.now();
+    const harvestAt = plantedAt + growTime;
+
+    const imageUrl = getMessageImage(originalMessage);
+
+    const saved = await insertPlanting({
+      guildId: interaction.guild.id,
+      channelId: interaction.channel.id,
+      userId: originalMessage.author.id,
+      messageId: originalMessage.id,
+      cropKey: parsed.cropKey,
+      amount: parsed.amount,
+      plantedAt,
+      harvestAt,
+      imageUrl
+    });
+
+    await incrementUserPlantings(originalMessage.author.id);
+    await incrementTotalPlantings(originalMessage.author.id);
+
+    const totalPlantings = await getTotalPlantings(originalMessage.author.id);
+
+    saved.imageUrl = imageUrl;
+
+    scheduleHarvest(saved);
+
+    const embed = buildPlantEmbed({
+      cropName: formatCropName(parsed.cropKey),
+      amount: parsed.amount,
+      userId: originalMessage.author.id,
+      plantedAt,
+      harvestAt,
+      imageUrl,
+      totalPlantings
+    });
+
+    await interaction.editReply({
+      content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
+      embeds: [embed],
+      components: []
+    });
+
+  } catch (err) {
+    console.error("SELECT MENU ERROR:", err);
+  }
+
+  return;
+}
 
     if (!interaction.isButton()) return;
 
