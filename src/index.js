@@ -144,8 +144,10 @@ function buildPlantEmbed({
   userId,
   plantedAt,
   harvestAt,
-  imageUrl
+  imageUrl,
+  totalPlantings
 }) {
+  
   const embed = new EmbedBuilder()
     .setTitle("🌱 Sadnja zabeležena!")
     .setDescription(`<@${userId}> je posadio/la.`)
@@ -160,6 +162,11 @@ function buildPlantEmbed({
         value: String(amount),
         inline: true
       },
+      {
+        name: "📈 Ukupno sadnji",
+        value: String(totalPlantings),
+        inline: true
+},
       {
         name: "🕒 Posađeno",
         value: discordTime(plantedAt),
