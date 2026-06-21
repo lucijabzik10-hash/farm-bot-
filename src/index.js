@@ -652,13 +652,14 @@ const totalPlantings =
       scheduleHarvest(saved);
 
       const embed = buildPlantEmbed({
-        cropName: formatCropName(parsed.cropKey),
-        amount: parsed.amount,
-        userId: originalMessage.author.id,
-        plantedAt,
-        harvestAt,
-        imageUrl
-      });
+  cropName: formatCropName(parsed.cropKey),
+  amount: parsed.amount,
+  userId: originalMessage.author.id,
+  plantedAt,
+  harvestAt,
+  imageUrl,
+  totalPlantings
+});
 
       await interaction.update({
         content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
