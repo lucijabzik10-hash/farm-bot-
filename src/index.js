@@ -150,9 +150,6 @@ client.on("interactionCreate", async (interaction) => {
     const plantedAt = Date.now();
     const harvestAt = plantedAt + growTime;
 
-    const planterId = originalMessage.author.id;
-const plantedAt = Date.now();
-const harvestAt = plantedAt + growTime;
 
 const attachmentImage =
   originalMessage.attachments.first()?.url || null;
