@@ -139,16 +139,16 @@ function buildPlantTimeMenu(messageId) {
   );
 }
 
-const embed = buildPlantEmbed({
-  cropName: formatCropName(parsed.cropKey),
-  amount: parsed.amount,
-  userId: originalMessage.author.id,
+function buildPlantEmbed({
+  cropName,
+  amount,
+  userId,
   plantedAt,
   harvestAt,
   imageUrl,
   totalPlantings
-});
-  
+}) {
+
   const embed = new EmbedBuilder()
     .setTitle("🌱 Sadnja zabeležena!")
     .setDescription(`<@${userId}> je posadio/la.`)
@@ -167,7 +167,7 @@ const embed = buildPlantEmbed({
         name: "📈 Ukupno sadnji",
         value: String(totalPlantings),
         inline: true
-},
+      },
       {
         name: "🕒 Posađeno",
         value: discordTime(plantedAt),
