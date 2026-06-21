@@ -6,7 +6,9 @@ const {
   Partials,
   EmbedBuilder,
   ActionRowBuilder,
-  StringSelectMenuBuilder
+  StringSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require("discord.js");
 
 const client = new Client({
@@ -22,7 +24,12 @@ const FARM_CHANNEL_ID = process.env.FARM_CHANNEL_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
 const HARVEST_LOG_CHANNEL_ID = "1518237730029437241";
+const READY_HARVEST_CHANNEL_ID = "1487121637454381243";
+const RANCHER_ROLE_ID = "1476259451353694313";
+
 const userPlantCounts = new Map();
+const activeIntervals = new Map();
+const pendingHarvests = new Map();
 
 const PLANT_TIMES = {
   plant_20: 240 * 60 * 1000,
@@ -41,8 +48,6 @@ const PLANT_TIMES = {
   plant_85: 45 * 60 * 1000,
   plant_95: 15 * 60 * 1000
 };
-
-const activeIntervals = new Map();
 
 function formatCropName(input) {
   return input
@@ -90,6 +95,15 @@ function buildPlantTimeMenu(messageId) {
   );
 }
 
+function buildHarvestButton(harvestId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`obrano_${harvestId}`)
+      .setLabel("Obrano")
+      .setStyle(ButtonStyle.Success)
+  );
+}
+
 function buildPlantEmbed({ cropName, amount, plantedAt, harvestAt, remaining }) {
   return new EmbedBuilder()
     .setTitle("🌱 Sadnja u toku")
@@ -110,10 +124,7 @@ client.on("messageCreate", async (message) => {
 
   if (message.content.toLowerCase() === "!stats") {
     const count = userPlantCounts.get(message.author.id) || 0;
-
-    return message.reply(
-      `📊 ${message.author} ima ukupno **${count}** završenih sadnji.`
-    );
+    return message.reply(`📊 ${message.author} ima ukupno **${count}** završenih sadnji.`);
   }
 
   const parsed = parsePlantMessage(message.content);
@@ -129,101 +140,153 @@ client.on("messageCreate", async (message) => {
 
 client.on("interactionCreate", async (interaction) => {
   try {
-    if (!interaction.isStringSelectMenu()) return;
-    if (!interaction.customId.startsWith("planttime_")) return;
+    if (interaction.isStringSelectMenu()) {
+      if (!interaction.customId.startsWith("planttime_")) return;
 
-    const growTime = PLANT_TIMES[interaction.values[0]];
-    if (!growTime) return;
+      const growTime = PLANT_TIMES[interaction.values[0]];
+      if (!growTime) return;
 
-    const messageId = interaction.customId.replace("planttime_", "");
+      const messageId = interaction.customId.replace("planttime_", "");
 
-    const originalMessage = await interaction.channel.messages
-      .fetch(messageId)
-      .catch(() => null);
+      const originalMessage = await interaction.channel.messages
+        .fetch(messageId)
+        .catch(() => null);
 
-    if (!originalMessage) return;
+      if (!originalMessage) return;
 
-    const parsed = parsePlantMessage(originalMessage.content);
-    if (!parsed) return;
+      const parsed = parsePlantMessage(originalMessage.content);
+      if (!parsed) return;
 
-    const planterId = originalMessage.author.id;
-    const plantedAt = Date.now();
-    const harvestAt = plantedAt + growTime;
+      const planterId = originalMessage.author.id;
+      const plantedAt = Date.now();
+      const harvestAt = plantedAt + growTime;
+      const attachmentImage = originalMessage.attachments.first()?.url || null;
 
+      const makeEmbed = () => {
+        const remaining = harvestAt - Date.now();
 
-const attachmentImage =
-  originalMessage.attachments.first()?.url || null;
-
-const makeEmbed = () => {
-  const remaining = harvestAt - Date.now();
-
-  const embed = buildPlantEmbed({
-    cropName: formatCropName(parsed.cropKey),
-    amount: parsed.amount,
-    plantedAt,
-    harvestAt,
-    remaining:
-      remaining <= 0
-        ? "✅ Spremno za berbu!"
-        : `⏳ Preostalo: ${discordTime(harvestAt, "R")}`
-  });
-
-  if (attachmentImage) {
-    embed.setImage(attachmentImage);
-  }
-
-  return embed;
-};
-
-    await interaction.update({
-      content: "",
-      embeds: [makeEmbed()],
-      components: []
-    });
-
-    const interval = setInterval(async () => {
-      const remaining = harvestAt - Date.now();
-
-      try {
-        await interaction.message.edit({
-          embeds: [makeEmbed()],
-          components: []
+        const embed = buildPlantEmbed({
+          cropName: formatCropName(parsed.cropKey),
+          amount: parsed.amount,
+          plantedAt,
+          harvestAt,
+          remaining:
+            remaining <= 0
+              ? "✅ Spremno za berbu!"
+              : `⏳ Preostalo: ${discordTime(harvestAt, "R")}`
         });
-      } catch (err) {
-        clearInterval(interval);
-        return;
-      }
 
-      if (remaining <= 0) {
-        clearInterval(interval);
+        if (attachmentImage) embed.setImage(attachmentImage);
 
-        const currentCount = userPlantCounts.get(planterId) || 0;
-        const newCount = currentCount + 1;
+        return embed;
+      };
 
-        userPlantCounts.set(planterId, newCount);
+      await interaction.update({
+        content: "",
+        embeds: [makeEmbed()],
+        components: []
+      });
 
-        await interaction.message.edit({
-          content: `✅ <@${planterId}> ${formatCropName(parsed.cropKey)} x${parsed.amount} je spremno za berbu!`,
-          embeds: [makeEmbed()],
-          components: []
-        }).catch(() => null);
+      const interval = setInterval(async () => {
+        const remaining = harvestAt - Date.now();
 
-        const logChannel = await client.channels
-          .fetch(HARVEST_LOG_CHANNEL_ID)
-          .catch(() => null);
-
-        if (logChannel) {
-          await logChannel.send(
-            `🌾 <@${planterId}> je završio sadnju.\n` +
-            `🌿 Usjev: **${formatCropName(parsed.cropKey)}**\n` +
-            `📦 Količina: **${parsed.amount}**\n` +
-            `📊 Ukupan broj sadnji: **${newCount}**`
-          ).catch(() => null);
+        try {
+          await interaction.message.edit({
+            embeds: [makeEmbed()],
+            components: []
+          });
+        } catch {
+          clearInterval(interval);
+          return;
         }
-      }
-    }, 60000);
 
-    activeIntervals.set(interaction.message.id, interval);
+        if (remaining <= 0) {
+          clearInterval(interval);
+
+          await interaction.message.edit({
+            content: `✅ <@${planterId}> ${formatCropName(parsed.cropKey)} x${parsed.amount} je spremno za berbu!`,
+            embeds: [makeEmbed()],
+            components: []
+          }).catch(() => null);
+
+          const harvestId = interaction.message.id;
+
+          pendingHarvests.set(harvestId, {
+            planterId,
+            cropName: formatCropName(parsed.cropKey),
+            amount: parsed.amount,
+            attachmentImage
+          });
+
+          const readyChannel = await client.channels
+            .fetch(READY_HARVEST_CHANNEL_ID)
+            .catch(() => null);
+
+          if (readyChannel) {
+            const readyEmbed = new EmbedBuilder()
+              .setTitle("🌾 Usjev je izrastao!")
+              .setColor(0xf1c40f)
+              .addFields(
+                { name: "👤 Igrač", value: `<@${planterId}>`, inline: true },
+                { name: "🌿 Usjev", value: formatCropName(parsed.cropKey), inline: true },
+                { name: "📦 Količina", value: String(parsed.amount), inline: true }
+              );
+
+            if (attachmentImage) readyEmbed.setImage(attachmentImage);
+
+            await readyChannel.send({
+              content: `<@&${RANCHER_ROLE_ID}> usjev je spreman za berbu!`,
+              embeds: [readyEmbed],
+              components: [buildHarvestButton(harvestId)]
+            }).catch(() => null);
+          }
+        }
+      }, 60000);
+
+      activeIntervals.set(interaction.message.id, interval);
+      return;
+    }
+
+    if (interaction.isButton()) {
+      if (!interaction.customId.startsWith("obrano_")) return;
+
+      const harvestId = interaction.customId.replace("obrano_", "");
+      const harvestData = pendingHarvests.get(harvestId);
+
+      if (!harvestData) {
+        return interaction.reply({
+          content: "⚠️ Ova berba je već obrađena ili bot je restartovan.",
+          ephemeral: true
+        });
+      }
+
+      const { planterId, cropName, amount } = harvestData;
+
+      const currentCount = userPlantCounts.get(planterId) || 0;
+      const newCount = currentCount + 1;
+      userPlantCounts.set(planterId, newCount);
+
+      pendingHarvests.delete(harvestId);
+
+      await interaction.update({
+        content: `✅ <@${interaction.user.id}> je kliknuo **Obrano** za <@${planterId}>.`,
+        embeds: interaction.message.embeds,
+        components: []
+      });
+
+      const logChannel = await client.channels
+        .fetch(HARVEST_LOG_CHANNEL_ID)
+        .catch(() => null);
+
+      if (logChannel) {
+        await logChannel.send(
+          `🌾 <@${planterId}> je završio sadnju.\n` +
+          `🌿 Usjev: **${cropName}**\n` +
+          `📦 Količina: **${amount}**\n` +
+          `📊 Ukupan broj sadnji: **${newCount}**`
+        ).catch(() => null);
+      }
+    }
   } catch (err) {
     console.error(err);
   }
