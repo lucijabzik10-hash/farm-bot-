@@ -568,15 +568,16 @@ client.on("interactionCreate", async (interaction) => {
   console.log("INTERACTION RECEIVED");
 
   try {
-    console.log("CUSTOM ID:", interaction.customId);
 
     if (interaction.isStringSelectMenu()) {
+
+      await interaction.deferUpdate();
 
       if (!interaction.customId.startsWith("planttime_")) {
         return;
       }
 
-      console.log("SELECT MENU CLICKED");
+      console.log("CUSTOM ID:", interaction.customId);
 
       const growTime = PLANT_TIMES[interaction.values[0]];
 
@@ -584,7 +585,7 @@ client.on("interactionCreate", async (interaction) => {
       console.log("GROW TIME:", growTime);
 
       if (!growTime) {
-        await interaction.reply({
+        await interaction.followUp({
           content: "Nepoznato vreme sadnje.",
           ephemeral: true
         });
@@ -597,8 +598,6 @@ client.on("interactionCreate", async (interaction) => {
           ""
         );
 
-      console.log("MESSAGE ID:", originalMessageId);
-
       const originalMessage =
         await interaction.channel.messages
           .fetch(originalMessageId)
@@ -608,30 +607,22 @@ client.on("interactionCreate", async (interaction) => {
           });
 
       if (!originalMessage) {
-        console.log("ORIGINAL MESSAGE NOT FOUND");
-
-        await interaction.reply({
+        await interaction.followUp({
           content: "Ne mogu pronaći originalnu poruku.",
           ephemeral: true
         });
-
         return;
       }
-
-      console.log("ORIGINAL MESSAGE FOUND");
 
       const parsed = parsePlantMessage(
         originalMessage.content
       );
 
       if (!parsed) {
-        console.log("PARSE FAILED");
-
-        await interaction.reply({
+        await interaction.followUp({
           content: "Neispravna sadnja.",
           ephemeral: true
         });
-
         return;
       }
 
@@ -640,8 +631,6 @@ client.on("interactionCreate", async (interaction) => {
 
       const imageUrl =
         getMessageImage(originalMessage);
-
-      console.log("BEFORE INSERT");
 
       const saved = await insertPlanting({
         guildId: interaction.guild.id,
@@ -654,8 +643,6 @@ client.on("interactionCreate", async (interaction) => {
         harvestAt,
         imageUrl
       });
-
-      console.log("AFTER INSERT");
 
       await incrementUserPlantings(
         originalMessage.author.id
@@ -684,22 +671,18 @@ client.on("interactionCreate", async (interaction) => {
         totalPlantings
       });
 
-      console.log("BEFORE UPDATE");
-
-      await interaction.update({
+      await interaction.editReply({
         content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
         embeds: [embed],
         components: []
       });
-
-      console.log("AFTER UPDATE");
 
       return;
     }
 
     if (!interaction.isButton()) return;
 
-    // OSTATAK TVOG BUTTON KODA OSTAVI ISPOD OVOGA
+        
 
     if (!interaction.customId.startsWith("obrano_")) {
       return;
