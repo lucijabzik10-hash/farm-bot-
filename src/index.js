@@ -571,7 +571,6 @@ client.on("interactionCreate", async (interaction) => {
 
     if (interaction.isStringSelectMenu()) {
 
-      await interaction.deferUpdate();
 
       if (!interaction.customId.startsWith("planttime_")) {
         return;
