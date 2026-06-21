@@ -130,23 +130,24 @@ function buildPlantTimeMenu(messageId) {
       .setCustomId(`planttime_${messageId}`)
       .setPlaceholder("Izaberi postotak sadnje")
       .addOptions(
-        { label: "20% - 1h", value: "plant_20" },
-        { label: "25% - 1h 15min", value: "plant_25" },
-        { label: "30% - 1h 30min", value: "plant_30" },
-        { label: "35% - 1h 45min", value: "plant_35" },
-        { label: "40% - 2h", value: "plant_40" },
-        { label: "45% - 2h 15min", value: "plant_45" },
+        { label: "20% - 4h", value: "plant_20" },
+        { label: "25% - 3h 45min", value: "plant_25" },
+        { label: "30% - 3h 30min", value: "plant_30" },
+        { label: "35% - 3h 15min", value: "plant_35" },
+        { label: "40% - 3h", value: "plant_40" },
+        { label: "45% - 2h 45min", value: "plant_45" },
         { label: "50% - 2h 30min", value: "plant_50" },
-        { label: "55% - 2h 45min", value: "plant_55" },
-        { label: "60% - 3h", value: "plant_60" },
-        { label: "65% - 3h 15min", value: "plant_65" },
-        { label: "70% - 3h 30min", value: "plant_70" },
-        { label: "75% - 3h 45min", value: "plant_75" },
-        { label: "80% - 4h", value: "plant_80" },
-        { label: "85% - 4h 15min", value: "plant_85" }
+        { label: "55% - 2h 15min", value: "plant_55" },
+        { label: "60% - 2h", value: "plant_60" },
+        { label: "65% - 1h 45min", value: "plant_65" },
+        { label: "70% - 1h 30min", value: "plant_70" },
+        { label: "75% - 1h 15min", value: "plant_75" },
+        { label: "80% - 1h", value: "plant_80" },
+        { label: "85% - 45min", value: "plant_85" }
       )
   );
 }
+
 
 // ================= EVENTS =================
 
