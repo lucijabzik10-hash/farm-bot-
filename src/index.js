@@ -766,6 +766,7 @@ const totalPlantings =
   console.error(err.stack);
   }
 
+  });
 client.once("clientReady", () => {
 
   console.log(
