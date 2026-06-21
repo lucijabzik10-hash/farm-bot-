@@ -360,6 +360,42 @@ function incrementUserPlantings(userId) {
   });
 }
 
+function incrementTotalPlantings(userId) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `
+      INSERT INTO user_stats (user_id, total_plantings)
+      VALUES (?, 1)
+      ON CONFLICT(user_id)
+      DO UPDATE SET total_plantings = total_plantings + 1
+      `,
+      [userId],
+      (err) => {
+        if (err) return reject(err);
+        resolve();
+      }
+    );
+  });
+}
+
+function getTotalPlantings(userId) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `
+      SELECT total_plantings
+      FROM user_stats
+      WHERE user_id = ?
+      `,
+      [userId],
+      (err, row) => {
+        if (err) return reject(err);
+
+        resolve(row ? row.total_plantings : 0);
+      }
+    );
+  });
+}
+
 async function sendHarvestMessage(row) {
   const harvestChannelIds = [
     HARVEST_CHANNEL_ID_1,
