@@ -569,13 +569,77 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
 
+    // =========================
+    // STRING SELECT MENU (sadnja)
+    // =========================
     if (interaction.isStringSelectMenu()) {
-      // ... tvoj select menu kod
+
+      if (!interaction.customId.startsWith("planttime_")) return;
+
+      await interaction.deferUpdate(); // 🔥 KLJUČNO
+
+      const growTime = PLANT_TIMES[interaction.values[0]];
+
+      if (!growTime) return;
+
+      const originalMessageId = interaction.customId.replace("planttime_", "");
+
+      const originalMessage = await interaction.channel.messages
+        .fetch(originalMessageId)
+        .catch(() => null);
+
+      if (!originalMessage) return;
+
+      const parsed = parsePlantMessage(originalMessage.content);
+      if (!parsed) return;
+
+      const plantedAt = Date.now();
+      const harvestAt = plantedAt + growTime;
+
+      const imageUrl = getMessageImage(originalMessage);
+
+      const saved = await insertPlanting({
+        guildId: interaction.guild.id,
+        channelId: interaction.channel.id,
+        userId: originalMessage.author.id,
+        messageId: originalMessage.id,
+        cropKey: parsed.cropKey,
+        amount: parsed.amount,
+        plantedAt,
+        harvestAt,
+        imageUrl
+      });
+
+      await incrementUserPlantings(originalMessage.author.id);
+      await incrementTotalPlantings(originalMessage.author.id);
+
+      const totalPlantings = await getTotalPlantings(originalMessage.author.id);
+
+      scheduleHarvest(saved);
+
+      const embed = buildPlantEmbed({
+        cropName: formatCropName(parsed.cropKey),
+        amount: parsed.amount,
+        userId: originalMessage.author.id,
+        plantedAt,
+        harvestAt,
+        imageUrl,
+        totalPlantings
+      });
+
+      await interaction.editReply({
+        content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
+        embeds: [embed],
+        components: []
+      });
+
       return;
     }
 
+    // =========================
+    // BUTTON (obrano)
+    // =========================
     if (!interaction.isButton()) return;
-
     if (!interaction.customId.startsWith("obrano_")) return;
 
     const plantingId = interaction.customId.replace("obrano_", "");
@@ -602,24 +666,16 @@ client.on("interactionCreate", async (interaction) => {
     const kolicina = fieldMap.get("📦 Količina") || "0";
 
     const plantedUserMatch = interaction.message.content.match(/<@(\d+)>/);
-    const plantedUserId = plantedUserMatch
-      ? plantedUserMatch[1]
-      : interaction.user.id;
+    const plantedUserId = plantedUserMatch ? plantedUserMatch[1] : interaction.user.id;
 
     let plantedAt = Date.now();
     let harvestAt = Date.now();
 
-    const readyField =
-      fieldMap.get("✅ Spremno") ||
-      fieldMap.get("⏰ Bilo spremno");
-
     const plantedField = fieldMap.get("🕒 Posađeno");
+    const readyField = fieldMap.get("✅ Spremno") || fieldMap.get("⏰ Bilo spremno");
 
-    const plantedTimestampMatch =
-      plantedField?.match(/<t:(\d+):[a-z]>/i);
-
-    const readyTimestampMatch =
-      readyField?.match(/<t:(\d+):[a-z]>/i);
+    const plantedTimestampMatch = plantedField?.match(/<t:(\d+):[a-z]>/i);
+    const readyTimestampMatch = readyField?.match(/<t:(\d+):[a-z]>/i);
 
     if (plantedTimestampMatch) {
       plantedAt = Number(plantedTimestampMatch[1]) * 1000;
