@@ -342,6 +342,24 @@ function insertPlanting(data) {
   });
 }
 
+function incrementUserPlantings(userId) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      `
+      INSERT INTO daily_stats (user_id, plantings)
+      VALUES (?, 1)
+      ON CONFLICT(user_id)
+      DO UPDATE SET plantings = plantings + 1
+      `,
+      [userId],
+      (err) => {
+        if (err) return reject(err);
+        resolve();
+      }
+    );
+  });
+}
+
 async function sendHarvestMessage(row) {
   const harvestChannelIds = [
     HARVEST_CHANNEL_ID_1,
