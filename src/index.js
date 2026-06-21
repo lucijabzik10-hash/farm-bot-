@@ -662,22 +662,22 @@ client.on("interactionCreate", async (interaction) => {
       scheduleHarvest(saved);
 
       const embed = buildPlantEmbed({
-        cropName: formatCropName(parsed.cropKey),
-        amount: parsed.amount,
-        userId: originalMessage.author.id,
-        plantedAt,
-        harvestAt,
-        imageUrl,
-        totalPlantings
-      });
+  cropName: formatCropName(parsed.cropKey),
+  amount: parsed.amount,
+  userId: originalMessage.author.id,
+  plantedAt,
+  harvestAt,
+  imageUrl,
+  totalPlantings
+});
 
-      await interaction.editReply({
-        content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
-        embeds: [embed],
-        components: []
-      });
+await interaction.update({
+  content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
+  embeds: [embed],
+  components: []
+});
 
-      return;
+return;
     }
 
     if (!interaction.isButton()) return;
