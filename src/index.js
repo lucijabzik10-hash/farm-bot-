@@ -570,60 +570,88 @@ client.on("interactionCreate", async (interaction) => {
   try {
 
     if (interaction.isStringSelectMenu()) {
+      // ... tvoj select menu kod
+      return;
+    }
 
+    if (!interaction.isButton()) return;
 
-      if (!interaction.customId.startsWith("planttime_")) {
-        return;
-      }
+    if (!interaction.customId.startsWith("obrano_")) return;
 
-      console.log("CUSTOM ID:", interaction.customId);
+    const plantingId = interaction.customId.replace("obrano_", "");
 
-      const growTime = PLANT_TIMES[interaction.values[0]];
+    if (harvestedPlantings.has(plantingId)) {
+      await interaction.reply({
+        content: "Ovo je već obrano.",
+        ephemeral: true
+      });
+      return;
+    }
 
-      console.log("SELECTED:", interaction.values[0]);
-      console.log("GROW TIME:", growTime);
+    harvestedPlantings.add(plantingId);
 
-      if (!growTime) {
-        await interaction.followUp({
-          content: "Nepoznato vreme sadnje.",
-          ephemeral: true
-        });
-        return;
-      }
+    const embed = interaction.message.embeds[0];
+    const existingImage = embed?.image?.url || null;
 
-      const originalMessageId =
-        interaction.customId.replace(
-          "planttime_",
-          ""
-        );
+    const fieldMap = new Map();
+    for (const field of embed?.fields || []) {
+      fieldMap.set(field.name, field.value);
+    }
 
-      const originalMessage =
-        await interaction.channel.messages
-          .fetch(originalMessageId)
-          .catch(err => {
-            console.error("FETCH ERROR:", err);
-            return null;
-          });
+    const vrsta = fieldMap.get("🌿 Vrsta") || "Nepoznato";
+    const kolicina = fieldMap.get("📦 Količina") || "0";
 
-      if (!originalMessage) {
-        await interaction.followUp({
-          content: "Ne mogu pronaći originalnu poruku.",
-          ephemeral: true
-        });
-        return;
-      }
+    const plantedUserMatch = interaction.message.content.match(/<@(\d+)>/);
+    const plantedUserId = plantedUserMatch
+      ? plantedUserMatch[1]
+      : interaction.user.id;
 
-      const parsed = parsePlantMessage(
-        originalMessage.content
-      );
+    let plantedAt = Date.now();
+    let harvestAt = Date.now();
 
-      if (!parsed) {
-        await interaction.followUp({
-          content: "Neispravna sadnja.",
-          ephemeral: true
-        });
-        return;
+    const readyField =
+      fieldMap.get("✅ Spremno") ||
+      fieldMap.get("⏰ Bilo spremno");
 
+    const plantedField = fieldMap.get("🕒 Posađeno");
+
+    const plantedTimestampMatch =
+      plantedField?.match(/<t:(\d+):[a-z]>/i);
+
+    const readyTimestampMatch =
+      readyField?.match(/<t:(\d+):[a-z]>/i);
+
+    if (plantedTimestampMatch) {
+      plantedAt = Number(plantedTimestampMatch[1]) * 1000;
+    }
+
+    if (readyTimestampMatch) {
+      harvestAt = Number(readyTimestampMatch[1]) * 1000;
+    }
+
+    const editedEmbed = buildHarvestedEmbed({
+      cropName: vrsta,
+      amount: kolicina,
+      plantedUserId,
+      harvestedByUserId: interaction.user.id,
+      plantedAt,
+      harvestAt,
+      harvestedAt: Date.now(),
+      imageUrl: existingImage
+    });
+
+    await interaction.update({
+      content: `✅ Obrano od strane <@${interaction.user.id}>`,
+      embeds: [editedEmbed],
+      components: []
+    });
+
+  } catch (err) {
+    console.error("FULL ERROR:");
+    console.error(err);
+    console.error(err.stack);
+  }
+});
 
 if (interaction.isStringSelectMenu()) {
   if (!interaction.customId.startsWith("planttime_")) return;
