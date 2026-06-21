@@ -154,36 +154,52 @@ client.on("interactionCreate", async (interaction) => {
     const plantedAt = Date.now();
     const harvestAt = plantedAt + growTime;
 
-    const sentMessage = await interaction.reply({
-      content: "🌱 Sadnja pokrenuta...",
-      fetchReply: true
-    });
+    const makeEmbed = () => {
+      const remaining = harvestAt - Date.now();
 
-    // LIVE UPDATE LOOP
-    const interval = setInterval(async () => {
-      const now = Date.now();
-      const remaining = harvestAt - now;
-
-      const embed = buildPlantEmbed({
+      return buildPlantEmbed({
         cropName: formatCropName(parsed.cropKey),
         amount: parsed.amount,
         plantedAt,
         harvestAt,
-        remaining: formatRemaining(remaining)
-      });
+        remaining: remaining <= 0
+          ? "✅ Spremno za berbu!"
+          : `⏳ Preostalo: ${discordTime(harvestAt, "R")}`
+      })
+      .setImage("https://media.tenor.com/2roX3uxz_68AAAAC/farming-farm.gif");
+    };
+
+    await interaction.update({
+      content: "",
+      embeds: [makeEmbed()],
+      components: []
+    });
+
+    const interval = setInterval(async () => {
+      const remaining = harvestAt - Date.now();
 
       try {
-        await sentMessage.edit({ embeds: [embed] });
+        await interaction.message.edit({
+          embeds: [makeEmbed()],
+          components: []
+        });
       } catch (err) {
         clearInterval(interval);
+        return;
       }
 
       if (remaining <= 0) {
         clearInterval(interval);
-      }
-    }, 60000); // svake 60 sekundi
 
-    activeIntervals.set(sentMessage.id, interval);
+        await interaction.message.edit({
+          content: `✅ ${formatCropName(parsed.cropKey)} x${parsed.amount} je spremno za berbu!`,
+          embeds: [makeEmbed()],
+          components: []
+        }).catch(() => null);
+      }
+    }, 60000);
+
+    activeIntervals.set(interaction.message.id, interval);
 
   } catch (err) {
     console.error(err);
