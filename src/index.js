@@ -84,7 +84,7 @@ function buildPlantTimeMenu(messageId) {
         { label: "70% - 1h 30min", value: "plant_70" },
         { label: "75% - 1h 15min", value: "plant_75" },
         { label: "80% - 1h", value: "plant_80" },
-        { label: "85% - 45min", value: "plant_85" } 
+        { label: "85% - 45min", value: "plant_85" },
         { label: "95% - 15min", value: "plant_95" }
       )
   );
