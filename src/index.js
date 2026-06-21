@@ -402,23 +402,20 @@ function getTotalPlantings(userId) {
     );
   });
 }
-
 async function sendHarvestMessage(row) {
   const harvestChannelIds = [
     HARVEST_CHANNEL_ID_1,
     HARVEST_CHANNEL_ID_2
   ];
 
-  const embed = buildPlantEmbed({
-  cropName: formatCropName(parsed.cropKey),
-  amount: parsed.amount,
-  userId: originalMessage.author.id,
-  plantedAt,
-  harvestAt,
-  imageUrl,
-  totalPlantings
-});
-  
+  const embed = buildHarvestEmbed({
+    cropName: formatCropName(row.cropKey),
+    amount: row.amount,
+    userId: row.userId,
+    plantedAt: row.plantedAt,
+    harvestAt: row.harvestAt,
+    imageUrl: row.imageUrl
+  });
 
   const content = HARVEST_ROLE_ID
     ? `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`
@@ -429,17 +426,16 @@ async function sendHarvestMessage(row) {
       .fetch(channelId)
       .catch(() => null);
 
-    if (!channel || !channel.isTextBased()) {
-      continue;
-    }
+    if (!channel || !channel.isTextBased()) continue;
 
     await channel.send({
       content,
       embeds: [embed],
       components: [buildHarvestButton(row.id)]
-    }).catch(console.error);
+    });
   }
 }
+
 
 function scheduleHarvest(row) {
   const delay = Math.max(
