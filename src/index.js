@@ -565,9 +565,10 @@ client.on("messageCreate", async (message) => {
 });
 
 client.on("interactionCreate", async (interaction) => {
-  try {
+  console.log("INTERACTION RECEIVED");
 
-    console.log("INTERACTION:", interaction.customId);
+  try {
+    console.log("CUSTOM ID:", interaction.customId);
 
     if (interaction.isStringSelectMenu()) {
 
@@ -575,7 +576,12 @@ client.on("interactionCreate", async (interaction) => {
         return;
       }
 
+      console.log("SELECT MENU CLICKED");
+
       const growTime = PLANT_TIMES[interaction.values[0]];
+
+      console.log("SELECTED:", interaction.values[0]);
+      console.log("GROW TIME:", growTime);
 
       if (!growTime) {
         await interaction.reply({
@@ -591,28 +597,41 @@ client.on("interactionCreate", async (interaction) => {
           ""
         );
 
+      console.log("MESSAGE ID:", originalMessageId);
+
       const originalMessage =
         await interaction.channel.messages
           .fetch(originalMessageId)
-          .catch(() => null);
+          .catch(err => {
+            console.error("FETCH ERROR:", err);
+            return null;
+          });
 
       if (!originalMessage) {
+        console.log("ORIGINAL MESSAGE NOT FOUND");
+
         await interaction.reply({
           content: "Ne mogu pronaći originalnu poruku.",
           ephemeral: true
         });
+
         return;
       }
+
+      console.log("ORIGINAL MESSAGE FOUND");
 
       const parsed = parsePlantMessage(
         originalMessage.content
       );
 
       if (!parsed) {
+        console.log("PARSE FAILED");
+
         await interaction.reply({
           content: "Neispravna sadnja.",
           ephemeral: true
         });
+
         return;
       }
 
@@ -621,6 +640,8 @@ client.on("interactionCreate", async (interaction) => {
 
       const imageUrl =
         getMessageImage(originalMessage);
+
+      console.log("BEFORE INSERT");
 
       const saved = await insertPlanting({
         guildId: interaction.guild.id,
@@ -633,33 +654,37 @@ client.on("interactionCreate", async (interaction) => {
         harvestAt,
         imageUrl
       });
-     await incrementUserPlantings(
-  originalMessage.author.id
-);
 
-await incrementTotalPlantings(
-  originalMessage.author.id
-);
+      console.log("AFTER INSERT");
 
-const totalPlantings =
-  await getTotalPlantings(
-    originalMessage.author.id
-  );
-      
+      await incrementUserPlantings(
+        originalMessage.author.id
+      );
+
+      await incrementTotalPlantings(
+        originalMessage.author.id
+      );
+
+      const totalPlantings =
+        await getTotalPlantings(
+          originalMessage.author.id
+        );
 
       saved.imageUrl = imageUrl;
 
       scheduleHarvest(saved);
 
       const embed = buildPlantEmbed({
-  cropName: formatCropName(parsed.cropKey),
-  amount: parsed.amount,
-  userId: originalMessage.author.id,
-  plantedAt,
-  harvestAt,
-  imageUrl,
-  totalPlantings
-});
+        cropName: formatCropName(parsed.cropKey),
+        amount: parsed.amount,
+        userId: originalMessage.author.id,
+        plantedAt,
+        harvestAt,
+        imageUrl,
+        totalPlantings
+      });
+
+      console.log("BEFORE UPDATE");
 
       await interaction.update({
         content: `✅ Sadnja zabeležena za <@${originalMessage.author.id}>.`,
@@ -667,10 +692,14 @@ const totalPlantings =
         components: []
       });
 
+      console.log("AFTER UPDATE");
+
       return;
     }
 
     if (!interaction.isButton()) return;
+
+    // OSTATAK TVOG BUTTON KODA OSTAVI ISPOD OVOGA
 
     if (!interaction.customId.startsWith("obrano_")) {
       return;
