@@ -418,6 +418,7 @@ async function sendHarvestMessage(row) {
   imageUrl,
   totalPlantings
 });
+  
 
   const content = HARVEST_ROLE_ID
     ? `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`
