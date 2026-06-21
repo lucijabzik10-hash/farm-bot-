@@ -139,15 +139,15 @@ function buildPlantTimeMenu(messageId) {
   );
 }
 
-function buildPlantEmbed({
-  cropName,
-  amount,
-  userId,
+const embed = buildPlantEmbed({
+  cropName: formatCropName(parsed.cropKey),
+  amount: parsed.amount,
+  userId: originalMessage.author.id,
   plantedAt,
   harvestAt,
   imageUrl,
   totalPlantings
-}) {
+});
   
   const embed = new EmbedBuilder()
     .setTitle("🌱 Sadnja zabeležena!")
