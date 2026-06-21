@@ -566,6 +566,8 @@ client.on("messageCreate", async (message) => {
 client.on("interactionCreate", async (interaction) => {
   try {
 
+    console.log("INTERACTION:", interaction.customId);
+
     if (interaction.isStringSelectMenu()) {
 
       if (!interaction.customId.startsWith("planttime_")) {
@@ -758,12 +760,10 @@ const totalPlantings =
     });
 
   } catch (err) {
-    console.error(
-      "Greška u interactionCreate:",
-      err
-    );
+  console.error("FULL ERROR:");
+  console.error(err);
+  console.error(err.stack);
   }
-});
 
 client.once("clientReady", () => {
 
