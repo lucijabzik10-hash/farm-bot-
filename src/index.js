@@ -625,9 +625,18 @@ client.on("interactionCreate", async (interaction) => {
         harvestAt,
         imageUrl
       });
-      await incrementUserPlantings(
+     await incrementUserPlantings(
   originalMessage.author.id
 );
+
+await incrementTotalPlantings(
+  originalMessage.author.id
+);
+
+const totalPlantings =
+  await getTotalPlantings(
+    originalMessage.author.id
+  );
       
 
       saved.imageUrl = imageUrl;
