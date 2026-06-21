@@ -409,14 +409,15 @@ async function sendHarvestMessage(row) {
     HARVEST_CHANNEL_ID_2
   ];
 
-  const embed = buildHarvestEmbed({
-    cropName: formatCropName(row.cropKey),
-    amount: row.amount,
-    userId: row.userId,
-    plantedAt: row.plantedAt,
-    harvestAt: row.harvestAt,
-    imageUrl: row.imageUrl || null
-  });
+  const embed = buildPlantEmbed({
+  cropName: formatCropName(parsed.cropKey),
+  amount: parsed.amount,
+  userId: originalMessage.author.id,
+  plantedAt,
+  harvestAt,
+  imageUrl,
+  totalPlantings
+});
 
   const content = HARVEST_ROLE_ID
     ? `<@&${HARVEST_ROLE_ID}> <@${row.userId}>`
