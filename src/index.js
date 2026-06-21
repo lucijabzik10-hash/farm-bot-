@@ -411,6 +411,88 @@ function scheduleHarvest(row) {
   activeTimers.set(row.id, timeout);
 }
 
+async function sendDailyReport() {
+  try {
+    const channel = await client.channels.fetch(
+      DAILY_REPORT_CHANNEL_ID
+    ).catch(() => null);
+
+    if (!channel) return;
+
+    db.all(
+      `
+      SELECT *
+      FROM daily_stats
+      ORDER BY plantings DESC
+      `,
+      async (err, rows) => {
+
+        if (err) {
+          console.error(err);
+          return;
+        }
+
+        let description = "";
+
+        if (!rows.length) {
+          description =
+            "📊 Danas nije bilo nijedne sadnje.";
+        } else {
+
+          rows.forEach((row, index) => {
+
+            let medal = "🌱";
+
+            if (index === 0) medal = "🥇";
+            else if (index === 1) medal = "🥈";
+            else if (index === 2) medal = "🥉";
+
+            description +=
+              `${medal} <@${row.user_id}> — **${row.plantings}** sadnji\n`;
+          });
+
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle("📊 Dnevni izvještaj sadnji")
+          .setDescription(description)
+          .setColor(0x57f287)
+          .setTimestamp();
+
+        await channel.send({
+          embeds: [embed]
+        });
+
+        db.run("DELETE FROM daily_stats");
+      }
+    );
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function scheduleDailyReport() {
+
+  const now = new Date();
+
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0);
+
+  const ms = midnight - now;
+
+  setTimeout(() => {
+
+    sendDailyReport();
+
+    setInterval(
+      sendDailyReport,
+      24 * 60 * 60 * 1000
+    );
+
+  }, ms);
+}
+
 client.on("messageCreate", async (message) => {
   try {
     if (!message.guild) return;
@@ -507,6 +589,10 @@ client.on("interactionCreate", async (interaction) => {
         harvestAt,
         imageUrl
       });
+      await incrementUserPlantings(
+  originalMessage.author.id
+);
+      
 
       saved.imageUrl = imageUrl;
 
@@ -630,9 +716,12 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 client.once("clientReady", () => {
+
   console.log(
     `Bot online kao ${client.user.tag}`
   );
+
+  scheduleDailyReport();
 });
 
 const token = process.env.DISCORD_TOKEN?.trim();
