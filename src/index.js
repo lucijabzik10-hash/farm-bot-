@@ -150,20 +150,33 @@ client.on("interactionCreate", async (interaction) => {
     const plantedAt = Date.now();
     const harvestAt = plantedAt + growTime;
 
-    const makeEmbed = () => {
-      const remaining = harvestAt - Date.now();
+    const planterId = originalMessage.author.id;
+const plantedAt = Date.now();
+const harvestAt = plantedAt + growTime;
 
-      return buildPlantEmbed({
-        cropName: formatCropName(parsed.cropKey),
-        amount: parsed.amount,
-        plantedAt,
-        harvestAt,
-        remaining:
-          remaining <= 0
-            ? "✅ Spremno za berbu!"
-            : `⏳ Preostalo: ${discordTime(harvestAt, "R")}`
-      }).setImage("https://media.tenor.com/2roX3uxz_68AAAAC/farming-farm.gif");
-    };
+const attachmentImage =
+  originalMessage.attachments.first()?.url || null;
+
+const makeEmbed = () => {
+  const remaining = harvestAt - Date.now();
+
+  const embed = buildPlantEmbed({
+    cropName: formatCropName(parsed.cropKey),
+    amount: parsed.amount,
+    plantedAt,
+    harvestAt,
+    remaining:
+      remaining <= 0
+        ? "✅ Spremno za berbu!"
+        : `⏳ Preostalo: ${discordTime(harvestAt, "R")}`
+  });
+
+  if (attachmentImage) {
+    embed.setImage(attachmentImage);
+  }
+
+  return embed;
+};
 
     await interaction.update({
       content: "",
